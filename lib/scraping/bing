@@ -5,33 +5,29 @@ Created on Fri Mar 16 11:13:08 2018
 
 @author: alex
 """
-## Boilerplate code, to be refactored.
 
-import matplotlib.pyplot as plt
 from PIL import Image
 from io import BytesIO
 import requests
 
-subscription_key = ""
-assert subscription_key
+# I should probably subclass these ¯\_(ツ)_/¯ 
+class BingSearcher():
+    def __init__(self, api_key, data_root, api_secret=None):
+        self.rest_url = 'https://api.cognitive.microsoft.com/bing/v7.0/images/search'
+        self.key = api_key
+        self.data_root = data_root
+    
+    def download_images(self, query, page, search_grouping):
+        headers = {"Ocp-Apim-Subscription-Key" : self.key}
+        params  = {"q": query, "license": "public", "imageType": "photo"}
 
-search_url = "https://api.cognitive.microsoft.com/bing/v7.0/images/search"
-search_term = "snow on road"
+        response = requests.get(self.rest_url, headers=headers, params=params)
+        search_results = response.json()
 
-headers = {"Ocp-Apim-Subscription-Key" : subscription_key}
-params  = {"q": search_term, "license": "public", "imageType": "photo"}
-response = requests.get(search_url, headers=headers, params=params)
-response.raise_for_status()
-search_results = response.json()
+if __name__ == '__main__':
+    DATA_ROOT = '/home/alex/Documents/Scripts/road-incidents-thesis/data/'
+    API_KEY = u''
+    query = "Snow on road"
 
-thumbnail_urls = [img["thumbnailUrl"] for img in search_results["value"][:16]]
-
-f, axes = plt.subplots(4, 4)
-for i in range(4):
-    for j in range(4):
-        image_data = requests.get(thumbnail_urls[i+4*j])
-        image_data.raise_for_status()
-        image = Image.open(BytesIO(image_data.content))        
-        axes[i][j].imshow(image)
-        axes[i][j].axis("off")
-
+    searcher = BingSearcher(API_KEY, DATA_ROOT)
+    searcher.download_images(query,1, "snowy_road")
