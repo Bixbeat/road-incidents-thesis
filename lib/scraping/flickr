@@ -44,10 +44,9 @@ class FlickrSearcher():
                     'tag_mode':'all',
                     'page':str(page),
                     'format':'json',
-                    '&nojsoncallback':1
+                    'nojsoncallback':1
                 }
-        request = self._add_request_params(search_url, params)
-        response = self._send_request(request)
+        response = requests.get(search_url, params = params)
 
         return response.json()
 
@@ -55,10 +54,9 @@ class FlickrSearcher():
         size_url = self._create_method_url('flickr.photos.getSizes')
         params = {  'photo_id':image_id,
                     'format':'json',
-                    '&nojsoncallback':1
+                    'nojsoncallback':1
                 }        
-        request = self._add_request_params(size_url, params)
-        response = self._send_request(request)
+        response = requests.get(size_url, params = params)
         return response        
 
     def _get_highest_resolution_img(self, img_sizes):
@@ -75,9 +73,6 @@ class FlickrSearcher():
         for key in params:
             request += f'&{key}={params[key]}'
         return request
-
-    def _send_request(self, request_url):
-        return requests.post(request_url)
 
 if __name__ == '__main__':
     DATA_ROOT = '/home/alex/Documents/Scripts/road-incidents-thesis/data/'
