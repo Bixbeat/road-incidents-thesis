@@ -7,27 +7,80 @@ Created on Mon Mar 19 11:04:33 2018
 """
 
 import requests
+import time
+from os import path
+
+import img_handler
 
 class FlickrSearcher():
-    def __init__(self, api_key, api_secret=None):
-        self.rest_url = "https://api.flickr.com/services/rest/?"
+    def __init__(self, api_key, data_root, api_secret=None):
+        self.rest_url = 'https://api.flickr.com/services/rest/?'
         self.key = api_key
+        self.data_root = data_root
+
+    def download_tagged_images(self, tags, page, search_grouping):
+        image_ids = self.search_images(tags, page)
+        photos = image_ids['photos']['photo']
+
+        for i,_ in enumerate(photos):
+            sizes_response  = self.get_image_sizes(photos[i]['id'])
+            img_sizes = sizes_response.json()['sizes']
+        
+            if not img_sizes['candownload'] == 0:
+                # There has got to be a better way to find the highest node..
+                highest_res_node = [i for i,_ in enumerate(img_sizes['size'])][-1]
+                highest_res_source = img_sizes['size'][highest_res_node]['source']
+                image_bytes = requests.get(highest_res_source, stream=True)
+
+                if search_grouping != None:
+                    out_path = path.join(self.data_root, search_grouping, tags)
+                    image_path = out_path + f'/{id}'
+                    image_path ={self.data_root}
+                
+                img_handler.write_img_from_url(image_bytes, image_path)
+                            
+            time.sleep(0.2) # Restricting API call frequency to be a good citizen
 
     def search_images(self, tags, page=1):
-        request = self._create_method_url("flickr.photos.search")
-        request+= f"&tags={tags}&tag_mode=all&format=json"
+        search_url = self._create_method_url('flickr.photos.search')
+        params = {  'tags':tags,
+                    'tag_mode':'all',
+                    'page':str(page),
+                    'format':'json',
+                    '&nojsoncallback':1
+                }
+        request = self._add_request_params(search_url, params)
         response = self._send_request(request)
-        return response
+
+        return response.json()
+
+    def get_image_sizes(self, image_id):
+        size_url = self._create_method_url('flickr.photos.getSizes')
+        params = {  'photo_id':image_id,
+                    'format':'json',
+                    '&nojsoncallback':1
+                }        
+        request = self._add_request_params(size_url, params)
+        response = self._send_request(request)
+        return response        
 
     def _create_method_url(self, method):
         return f"{self.rest_url}method={method}&api_key={self.key}"
     
+    def _add_request_params(self, request, params):
+        for key in params:
+            request += f'&{key}={params[key]}'
+        return request
+        
     def _send_request(self, request_url):
         return requests.post(request_url)
-    
+
 if __name__ == '__main__':
-    api_key = u''
+    DATA_ROOT = '/home/alex/Documents/Scripts/thesis'
+    API_KEY = u''
     
-    searcher = FlickrSearcher(api_key)
-    print(searcher.search_images("snow+road",1))
+    searcher = FlickrSearcher(API_KEY, data_root = DATA_ROOT,)
+    searcher.download_tagged_images(tags='snow+road',
+                                    search_grouping = 'snowy_roads',
+                                    page = 1)
 
