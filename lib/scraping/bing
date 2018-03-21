@@ -5,6 +5,8 @@ Created on Fri Mar 16 11:13:08 2018
 
 @author: alex
 """
+## Boilerplate code, to be refactored.
+
 import matplotlib.pyplot as plt
 from PIL import Image
 from io import BytesIO

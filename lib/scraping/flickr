@@ -19,25 +19,22 @@ class FlickrSearcher():
         self.data_root = data_root
 
     def download_tagged_images(self, tags, page, search_grouping):
-        image_ids = self.search_images(tags, page)
-        photos = image_ids['photos']['photo']
+        all_ids = self.search_images(tags, page)
+        photos = all_ids['photos']['photo']
 
         for i,_ in enumerate(photos):
-            sizes_response  = self.get_image_sizes(photos[i]['id'])
+            image_id = photos[i]['id']
+            sizes_response  = self.get_image_sizes(image_id)
             img_sizes = sizes_response.json()['sizes']
         
             if not img_sizes['candownload'] == 0:
-                # There has got to be a better way to find the highest node..
-                highest_res_node = [i for i,_ in enumerate(img_sizes['size'])][-1]
-                highest_res_source = img_sizes['size'][highest_res_node]['source']
-                image_bytes = requests.get(highest_res_source, stream=True)
+                highest_res_img = self._get_highest_resolution_img(img_sizes)
 
-                if search_grouping != None:
-                    out_path = path.join(self.data_root, search_grouping, tags)
-                    image_path = out_path + f'/{id}'
-                    image_path ={self.data_root}
-                
-                img_handler.write_img_from_url(image_bytes, image_path)
+                out_dir = path.join(self.data_root, search_grouping, tags)
+                img_handler.create_dir_if_not_exist(out_dir)                    
+
+                image_path = out_dir + f'/{image_id}.png'
+                img_handler.write_img_from_url(highest_res_img, image_path)
                             
             time.sleep(0.2) # Restricting API call frequency to be a good citizen
 
@@ -64,6 +61,13 @@ class FlickrSearcher():
         response = self._send_request(request)
         return response        
 
+    def _get_highest_resolution_img(self, img_sizes):
+        # There has got to be a better way to find the highest resolution..
+        highest_res_node = [i for i,_ in enumerate(img_sizes['size'])][-1]
+        highest_res = img_sizes['size'][highest_res_node]['source']
+        image_bytes = requests.get(highest_res, stream=True)
+        return(image_bytes)
+
     def _create_method_url(self, method):
         return f"{self.rest_url}method={method}&api_key={self.key}"
     
@@ -71,15 +75,15 @@ class FlickrSearcher():
         for key in params:
             request += f'&{key}={params[key]}'
         return request
-        
+
     def _send_request(self, request_url):
         return requests.post(request_url)
 
 if __name__ == '__main__':
-    DATA_ROOT = '/home/alex/Documents/Scripts/thesis'
+    DATA_ROOT = '/home/alex/Documents/Scripts/road-incidents-thesis/data/'
     API_KEY = u''
     
-    searcher = FlickrSearcher(API_KEY, data_root = DATA_ROOT,)
+    searcher = FlickrSearcher(API_KEY, DATA_ROOT,)
     searcher.download_tagged_images(tags='snow+road',
                                     search_grouping = 'snowy_roads',
                                     page = 1)
