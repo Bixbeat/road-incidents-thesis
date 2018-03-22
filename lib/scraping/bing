@@ -6,23 +6,47 @@ Created on Fri Mar 16 11:13:08 2018
 @author: alex
 """
 
-from PIL import Image
 from io import BytesIO
+import os.path
 import requests
 
-# I should probably subclass these ¯\_(ツ)_/¯ 
+import img_handler
+
+# Base class should be refactored & combined with the flickrsearcher class due to very high similarity
+# Might do that if I have time down the line
 class BingSearcher():
     def __init__(self, api_key, data_root, api_secret=None):
         self.rest_url = 'https://api.cognitive.microsoft.com/bing/v7.0/images/search'
+        self.source = 'bing'
         self.key = api_key
         self.data_root = data_root
+        self.imgs_per_req = 150 # Max number of returns allowed per call
     
     def download_images(self, query, page, search_grouping):
-        headers = {"Ocp-Apim-Subscription-Key" : self.key}
-        params  = {"q": query, "license": "public", "imageType": "photo"}
+        offset = img_handler.assert_offset(page, self.imgs_per_req)
+        headers = {'Ocp-Apim-Subscription-Key' : self.key}
+        params  = { 'q': query,
+                    'license': 'public',
+                    'imageType': 'photo',
+                    'count':150,
+                    'offset':offset
+                }
 
         response = requests.get(self.rest_url, headers=headers, params=params)
         search_results = response.json()
+        
+        out_dir = img_handler.construct_output_dir(self.data_root, search_grouping, self.source, query)
+        img_handler.create_dir_if_not_exist(out_dir)
+
+        response_pickle = out_dir + f'/{query}_{offset}.pickle'
+        img_handler.store_response(response, response_pickle)
+
+        for search_result in search_results['value']:
+            image_id = search_result['imageId']
+            image_bytes = requests.get(search_result['contentUrl'], stream=True)         
+
+            image_path = out_dir + f'/{image_id}.png'
+            img_handler.write_img_from_url(image_bytes, image_path)
 
 if __name__ == '__main__':
     DATA_ROOT = '/home/alex/Documents/Scripts/road-incidents-thesis/data/'
@@ -30,4 +54,4 @@ if __name__ == '__main__':
     query = "Snow on road"
 
     searcher = BingSearcher(API_KEY, DATA_ROOT)
-    searcher.download_images(query,1, "snowy_road")
+    searcher.download_images(query, page=0, search_grouping = "snowy_road")

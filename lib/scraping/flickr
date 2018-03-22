@@ -17,10 +17,19 @@ class FlickrSearcher():
         self.rest_url = 'https://api.flickr.com/services/rest/?'
         self.key = api_key
         self.data_root = data_root
+        self.source = 'flickr'
+        self.imgs_per_req = 100 # Default, no need to increase it
 
     def download_tagged_images(self, tags, page, search_grouping):
-        all_ids = self.search_images(tags, page)
-        photos = all_ids['photos']['photo']
+        offset = img_handler.assert_offset(page, self.imgs_per_req)
+        response = self.search_images(tags, page)
+        photos = response.json()['photos']['photo']
+
+        out_dir = img_handler.construct_output_dir(self.data_root, search_grouping, self.source, tags)
+        img_handler.create_dir_if_not_exist(out_dir)     
+
+        response_pickle = out_dir + f'/{tags}_{offset}.pickle'
+        img_handler.store_response(response, response_pickle)
 
         for i,_ in enumerate(photos):
             image_id = photos[i]['id']
@@ -28,10 +37,7 @@ class FlickrSearcher():
             img_sizes = sizes_response.json()['sizes']
         
             if not img_sizes['candownload'] == 0:
-                highest_res_img = self._get_highest_resolution_img(img_sizes)
-
-                out_dir = path.join(self.data_root, search_grouping, tags)
-                img_handler.create_dir_if_not_exist(out_dir)                    
+                highest_res_img = self._get_highest_resolution_img(img_sizes)               
 
                 image_path = out_dir + f'/{image_id}.png'
                 img_handler.write_img_from_url(highest_res_img, image_path)
@@ -46,9 +52,9 @@ class FlickrSearcher():
                     'format':'json',
                     'nojsoncallback':1
                 }
+        
         response = requests.get(search_url, params = params)
-
-        return response.json()
+        return response
 
     def get_image_sizes(self, image_id):
         size_url = self._create_method_url('flickr.photos.getSizes')
@@ -80,6 +86,6 @@ if __name__ == '__main__':
     
     searcher = FlickrSearcher(API_KEY, DATA_ROOT,)
     searcher.download_tagged_images(tags='snow+road',
-                                    search_grouping = 'snowy_roads',
+                                    search_grouping = 'snowy_road',
                                     page = 1)
 
