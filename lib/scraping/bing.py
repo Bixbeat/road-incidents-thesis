@@ -38,11 +38,14 @@ class BingCaller(APICaller):
 
         for search_result in search_results['value']:
             image_id = search_result['imageId']
-            image_bytes = requests.get(search_result['contentUrl'], stream=True)
+            try: image_bytes = requests.get(search_result['contentUrl'], stream=True)
+            except Exception as e:
+                print(f"Unreachable URL: {search_result['contentUrl']}\n{str(e)}\n")
+                break
 
-            image_path = out_dir + f'/{image_id}.jpg'
+            image_path = out_dir + f'/{image_id}.png'
             try: self._save_image_file(image_bytes, image_path)
-            except: print(f"Unsaveable image: {search_result['contentUrl']}")
+            except Exception as e: print(f"Unsaveable image: {search_result['contentUrl']}\n{str(e)}\n")
 
 if __name__ == '__main__':
     BING_API_URL = 'https://api.cognitive.microsoft.com/bing/v7.0/images/search' 
