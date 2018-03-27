@@ -4,6 +4,7 @@
 Created on Mon Mar 19 11:04:33 2018
 
 @author: alex
+https://stackoverflow.com/questions/34035422/google-image-search-says-api-no-longer-available
 """
 from io import BytesIO
 import os.path
@@ -58,7 +59,7 @@ if __name__ == '__main__':
     CUSTOM_ENGINE = '013675800614641398741:wwg9y3xxkj0' # Create a custom search engine at https://cse.google.com
 
     search_grouping = "snowy_road"
-    page = 1
+    page = 0
     query = 'snow on road'
     
     searcher = GoogleCaller(source='google',
@@ -68,4 +69,4 @@ if __name__ == '__main__':
                             returns_per_req = 10,
                             cx = CUSTOM_ENGINE)
 
-    searcher.download_images(query, page=2, search_grouping = search_grouping)
+    searcher.download_images(query, search_grouping = search_grouping, page = page)
