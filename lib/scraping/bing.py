@@ -60,4 +60,4 @@ if __name__ == '__main__':
                             data_root = DATA_ROOT,
                             returns_per_req = 150
                         )
-    searcher.download_images(query, page=0, search_grouping = search_grouping)
+    searcher.download_images(query, search_grouping = search_grouping, page = 0)
