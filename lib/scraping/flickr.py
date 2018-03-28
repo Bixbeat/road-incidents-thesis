@@ -10,7 +10,7 @@ import requests
 import time
 from os import path
 
-from utils import APICaller
+from .utils import APICaller
 
 class FlickrCaller(APICaller):
     def __init__(self, source, rest_url, api_key, data_root, returns_per_req):
@@ -34,10 +34,8 @@ class FlickrCaller(APICaller):
         
             if not img_sizes['candownload'] == 0:
                 highest_res_url = self._get_highest_resolution_img(img_sizes)             
-                try: image_bytes = image_bytes = requests.get(highest_res_url, stream=True)
-                except Exception as e:
-                    print(f"Unreachable URL: {highest_res_url}\n{str(e)}\n")
-                    break       
+                try: image_bytes = image_bytes = requests.get(highest_res_url, timeout=10)
+                except Exception as e: print(f"Unreachable URL: {highest_res_url}\n{str(e)}\n")
 
                 image_path = out_dir + f'/{image_id}.png'
                 try: self._save_image_file(image_bytes, image_path)
@@ -78,19 +76,3 @@ class FlickrCaller(APICaller):
 
     def _create_method_url(self, method):
         return f"{self.rest_url}method={method}"
-
-if __name__ == '__main__':
-    DATA_ROOT = '/home/alex/Documents/Scripts/road-incidents-thesis/data/'
-    API_KEY = u''
-    FLICKR_API_URL = 'https://api.flickr.com/services/rest/?'
-
-    search_grouping = "snowy_road"
-    page = 0
-    
-    searcher = FlickrCaller(  source='flickr',
-                                rest_url = FLICKR_API_URL,
-                                api_key = API_KEY,
-                                data_root = DATA_ROOT,
-                                returns_per_req = 100)
-
-    searcher.download_tagged_images(tags = 'snow+road', search_grouping = search_grouping, page = page)

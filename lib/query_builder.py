@@ -5,4 +5,7 @@ Created on Mon Mar 19 11:04:33 2018
 
 @author: alex
 """
-## To be added
+from thesaurusScraper import thesaurus as thes
+
+query_term = thes.Word('street')
+print(query_term.synonyms())
