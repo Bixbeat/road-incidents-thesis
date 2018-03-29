@@ -4,6 +4,8 @@ import urllib
 import pickle
 from PIL import Image
 
+from lib.thesaurusScraper import thesaurus as th
+
 class APICaller():
     def __init__(self, source, rest_url, api_key, data_root, returns_per_req):
         self.rest_url = rest_url
@@ -31,4 +33,27 @@ class APICaller():
 
     def _assert_offset(self, page, imgs_per_req):
         assert(page >= 0)
-        return(page * imgs_per_req)        
+        return(page * imgs_per_req)      
+
+def get_query_combinations(first_term, second_term):
+    all_combinations = []
+
+    # pre-prending original search terms to ensure inclusion
+    synonyms_1 = th.Word(first_term).synonyms()
+    syn1 = [first_term]+synonyms_1
+    synonyms_2 = th.Word(second_term).synonyms().append(second_term)
+    syn2 = [second_term]+synonyms_2
+
+    for s1 in syn1:
+        for s2 in syn2:
+            all_combinations.append([s1, s2])
+    
+    return all_combinations
+
+def add_term_to_combinations(combinations, terms):
+    combos = []
+    for term in terms:
+        for combo in combinations:
+            combos.append(combo+[term])
+    return combos
+      
