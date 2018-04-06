@@ -32,13 +32,13 @@ if __name__ == '__main__':
     bing = BingCaller(BING_API_KEY, DATA_ROOT, returns_per_req = 100)
 
 ## Google
-    GOOGLE_API_KEY = u'-1CM' # From https://console.developers.google.com
+    GOOGLE_API_KEY = u'' # From https://console.developers.google.com
     CUSTOM_ENGINE = '013675800614641398741:wwg9y3xxkj0' # Create a custom search engine at https://cse.google.com
     google = GoogleCaller(GOOGLE_API_KEY, DATA_ROOT, returns_per_req = 10, cx = CUSTOM_ENGINE)
 
 ## Flickr
     FLICKR_API_KEY = u''
-    flickr = FlickrCaller(FLICKR_API_KEY, data_root = DATA_ROOT, returns_per_req = 100)
+    flickr = FlickrCaller(FLICKR_API_KEY, DATA_ROOT, returns_per_req = 100)
 
 ## Querying
     for combination in combinations:

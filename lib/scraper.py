@@ -42,17 +42,16 @@ class APICaller():
 class GoogleCaller(APICaller):
     # https://stackoverflow.com/questions/34035422/google-image-search-says-api-no-longer-available
     def __init__(self, api_key, data_root, returns_per_req, cx):
-        super().__init__(api_key,
-                        data_root,
-                        returns_per_req,
-                        source='google',
-                        rest_url='https://www.googleapis.com/customsearch/v1')
+        super().__init__('google',
+                         'https://www.googleapis.com/customsearch/v1',
+                         api_key,
+                         data_root,
+                         returns_per_req)
         self.cx = cx
         self.img_size = 'medium'
 
     def download_images(self, query, page, search_grouping):
         offset = self._assert_offset(page, self.returns_per_req)
-        # headers = {'key': self.key}
         params  = { 'key': self.key,
                     'gl':'uk',
                     'googlehost':'google.uk',
@@ -85,11 +84,11 @@ class GoogleCaller(APICaller):
 
 class BingCaller(APICaller):
     def __init__(self, api_key, data_root, returns_per_req):
-        super().__init__(api_key,
-                        data_root,
-                        returns_per_req,
-                        source='bing',
-                        rest_url='https://api.cognitive.microsoft.com/bing/v7.0/images/search')
+        super().__init__('bing',
+                         'https://api.cognitive.microsoft.com/bing/v7.0/images/search',
+                         api_key,
+                         data_root,
+                         returns_per_req)
 
     def download_images(self, query, page, search_grouping):
         offset = self._assert_offset(page, self.returns_per_req)
@@ -121,11 +120,11 @@ class BingCaller(APICaller):
 
 class FlickrCaller(APICaller):
     def __init__(self, api_key, data_root, returns_per_req):
-        super().__init__(api_key,
-                        data_root,
-                        returns_per_req,
-                        source='flickr',
-                        rest_url='https://api.flickr.com/services/rest/?')
+        super().__init__('flickr',
+                         'https://api.flickr.com/services/rest/?',
+                         api_key,
+                         data_root,
+                         returns_per_req)
 
     def download_tagged_images(self, query, page, search_grouping):
         offset = self._assert_offset(page, self.returns_per_req)
