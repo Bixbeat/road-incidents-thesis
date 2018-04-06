@@ -40,11 +40,17 @@ class APICaller():
         return(page * imgs_per_req)      
 
 class GoogleCaller(APICaller):
-    def __init__(self, source, rest_url, api_key, data_root, returns_per_req, cx):
-        super().__init__(source, rest_url, api_key, data_root, returns_per_req)
+    # https://stackoverflow.com/questions/34035422/google-image-search-says-api-no-longer-available
+    def __init__(self, api_key, data_root, returns_per_req, cx):
+        super().__init__(api_key,
+                        data_root,
+                        returns_per_req,
+                        source='google',
+                        rest_url='https://www.googleapis.com/customsearch/v1')
         self.cx = cx
+        self.img_size = 'medium'
 
-    def download_images(self, query, page, search_grouping, size):
+    def download_images(self, query, page, search_grouping):
         offset = self._assert_offset(page, self.returns_per_req)
         # headers = {'key': self.key}
         params  = { 'key': self.key,
@@ -53,7 +59,7 @@ class GoogleCaller(APICaller):
                     'cx':self.cx,
                     'q':query,
                     'searchType':'image',
-                    'imageSize':size,
+                    'imageSize':self.img_size,
                     'filter':'1',
                     'imgType':'photo',
                     'num':self.returns_per_req,
@@ -66,25 +72,30 @@ class GoogleCaller(APICaller):
         out_dir = self._construct_output_dir(search_grouping, query)
         self._create_dir_if_not_exist(out_dir)
 
-        response_pickle = out_dir + f'/{query}_{size}_{offset}.pickle'
+        response_pickle = out_dir + f'/{query}_{self.img_size}_{offset}.pickle'
         self._store_response(response, response_pickle)
 
         for i, search_result in enumerate(search_results['items']):
             try: image_bytes = requests.get(search_result['link'], timeout=10)
             except Exception as e: print(f"Unreachable URL: {search_result['link']}\n{str(e)}\n")
 
-            image_path = out_dir + f'/{size}_{offset+i+1}.png'
+            image_path = out_dir + f'/{self.img_size}_{offset+i+1}.png'
             try: self._save_image_file(image_bytes, image_path)
             except Exception as e: print(f"Unsaveable image: {search_result['link']}\n{str(e)}\n")
 
 class BingCaller(APICaller):
-    def __init__(self, source, rest_url, api_key, data_root, returns_per_req):
-        super().__init__(source, rest_url, api_key, data_root, returns_per_req)
+    def __init__(self, api_key, data_root, returns_per_req):
+        super().__init__(api_key,
+                        data_root,
+                        returns_per_req,
+                        source='bing',
+                        rest_url='https://api.cognitive.microsoft.com/bing/v7.0/images/search')
+
     def download_images(self, query, page, search_grouping):
         offset = self._assert_offset(page, self.returns_per_req)
         headers = {'Ocp-Apim-Subscription-Key' : self.key}
         params  = { 'q': query,
-                    'license': 'shareCommercially',
+                    # 'license': 'shareCommercially',
                     'imageType': 'photo',
                     'count':self.returns_per_req,
                     'offset':offset
@@ -109,8 +120,12 @@ class BingCaller(APICaller):
             except Exception as e: print(f"Unsaveable image: {search_result['contentUrl']}\n{str(e)}\n")
 
 class FlickrCaller(APICaller):
-    def __init__(self, source, rest_url, api_key, data_root, returns_per_req):
-        super().__init__(source, rest_url, api_key, data_root, returns_per_req)
+    def __init__(self, api_key, data_root, returns_per_req):
+        super().__init__(api_key,
+                        data_root,
+                        returns_per_req,
+                        source='flickr',
+                        rest_url='https://api.flickr.com/services/rest/?')
 
     def download_tagged_images(self, query, page, search_grouping):
         offset = self._assert_offset(page, self.returns_per_req)
