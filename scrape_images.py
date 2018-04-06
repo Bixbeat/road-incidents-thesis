@@ -17,7 +17,7 @@ def submit_query(api_caller, query, search_grouping, page):
         query (string): Image search query to search for.
         search_grouping (string): Folder grouping for search results.
         page (int): The page index to start from.
-    """    
+    """
     api_caller.download_images(query, search_grouping = search_grouping, page = page)
 
 if __name__ == '__main__':
@@ -37,7 +37,7 @@ if __name__ == '__main__':
     search_grouping = "snowy_road"    
 
 ## Bing
-    BING_API_KEY = u''
+    BING_API_KEY = u'' # From https://docs.microsoft.com/en-us/rest/api/cognitiveservices/bing-images-api-v7-reference 
     bing = BingCaller(BING_API_KEY, DATA_ROOT, returns_per_req = 100)
 
 ## Google
@@ -46,7 +46,7 @@ if __name__ == '__main__':
     google = GoogleCaller(GOOGLE_API_KEY, DATA_ROOT, returns_per_req = 10, cx = CUSTOM_ENGINE)
 
 ## Flickr
-    FLICKR_API_KEY = u''
+    FLICKR_API_KEY = u'' # From https://www.flickr.com/services/apps/ 
     flickr = FlickrCaller(FLICKR_API_KEY, DATA_ROOT, returns_per_req = 100)
 
 ## Querying
