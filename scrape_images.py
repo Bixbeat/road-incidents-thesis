@@ -10,12 +10,12 @@ from lib import scraper
 from lib.scraper import GoogleCaller, FlickrCaller, BingCaller
 
 def submit_query(api_caller, query, search_grouping, page):
-    """Submit a query to the specified target
+    """Submit a query to the specified target.
 
-    Args
+    Args:
         apicaller(APICaller): API class of the target.
         query (string): Image search query to search for.
-        search_gourping (string): Folder grouping for search results.
+        search_grouping (string): Folder grouping for search results.
         page (int): The page index to start from.
     """    
     api_caller.download_images(query, search_grouping = search_grouping, page = page)
@@ -42,7 +42,7 @@ if __name__ == '__main__':
 
 ## Google
     GOOGLE_API_KEY = u'' # From https://console.developers.google.com
-    CUSTOM_ENGINE = '' # Create a custom search engine at https://cse.google.com
+    CUSTOM_ENGINE = u'' # Create a custom search engine at https://cse.google.com
     google = GoogleCaller(GOOGLE_API_KEY, DATA_ROOT, returns_per_req = 10, cx = CUSTOM_ENGINE)
 
 ## Flickr

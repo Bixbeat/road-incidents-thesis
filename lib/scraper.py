@@ -13,55 +13,109 @@ from lib.thesaurusScraper import thesaurus as th
 class APICaller():
     """General API image searching wrapper.
     """    
-    def __init__(self, source, rest_url, api_key, data_root, returns_per_req):
+    def __init__(self, source, rest_url, api_key, data_root, images_per_req):
         """
         Args:
             source (string): Description for saving purposes.
-            rest_url (string): Target path for the API URL
-            api_key(string): The API key supplied for the API
-
+            rest_url (string): Target path for the API URL.
+            api_key(string): The API key supplied for the API.
+            data_root (string): The output path.
+            images_per_req (int): The total amount of items to return per search.
         """        
         self.rest_url = rest_url
         self.source = source
         self.key = api_key
         self.data_root = data_root
-        self.returns_per_req = returns_per_req # Max number of returns allowed per call
+        self.images_per_req = images_per_req # Max number of returns allowed per call
 
         self.error_code = None
 
     def _save_image_file(self, image_bytes, path):
+        """Saves a bytes object to a specified target location.
+
+        Args:
+            image_bytes (byte): An image object.
+            path (string): Output path for the image object.
+        """          
         with io.BytesIO(image_bytes.content) as f:
             f.seek(0)
             with Image.open(f) as img:
                 img.save(path)
 
     def _create_dir_if_not_exist(self, directory):
+        """Creates a directory if the path does not yet exist.
+
+        Args:
+            directory (string): The directory to create.
+        """          
         if not os.path.exists(directory):
             os.makedirs(directory)
 
     def _construct_output_dir(self, search_grouping, query):
+        """Creates a directory path for a search.
+
+        Args:
+            search_grouping (string): Folder grouping for search results.
+            query (string): Image search query to search for.
+
+        Returns:
+            The constructed output directory.
+        """        
         return(os.path.join(self.data_root, search_grouping, self.source, query))
 
     def _store_response(self, response, pickle_file):
+        """Pickles a response file for later processing.
+
+        Args:
+            response (dict): Response object retrieved from API.
+            pickle_file: File path of the pickle to save.
+        """                
         with open(pickle_file, 'wb') as p:
             pickle.dump(response, p, protocol=pickle.HIGHEST_PROTOCOL)
 
     def _assert_offset(self, page, imgs_per_req):
+        """Determines the starting index based on the page and the number of requests
+
+        Args:
+            page (int): The page index to start from.
+            images_per_req (int): The total amount of items to return per search.
+
+        Returns:
+            The offset based on the page number and images per request.
+        """        
         assert(page >= 0)
         return(page * imgs_per_req)      
 
     def _check_status_code(self, status_code):
+        """Check if the last run resulted in an error code from the API.
+
+        Args:
+            status_code (int): The status code returned by the API call.
+        """        
         if status_code != 200:
             self.error_code = status_code
             print(f'aborting further execution, error code {status_code} received for {self.source} caller')
     
     def _check_if_key_exists(self, key, results):
+        """Check whether a given key exists in a dictionary.
+
+        Args:
+            key (string): The key to search for.
+            results (dict): The dictionary containing the API response.
+        
+        Returns:
+            False if the key does not exist
+        """           
         if not key in results.keys():
-            print("Response contains no items, aborting")
+            print(f"Response does not contain key {key}, aborting")
             return False
 
 class GoogleCaller(APICaller):
-    # https://stackoverflow.com/questions/34035422/google-image-search-says-api-no-longer-available
+    """Subclass for calling Google API calls & handling response.
+
+    See the following link for a more extensive overview of the set-up:
+    https://stackoverflow.com/questions/34035422/google-image-search-says-api-no-longer-available
+    """
     def __init__(self, api_key, data_root, returns_per_req, cx):
         super().__init__('google',
                          'https://www.googleapis.com/customsearch/v1',
@@ -74,7 +128,7 @@ class GoogleCaller(APICaller):
     def download_images(self, query, page, search_grouping):
         if self.error_code: return 0 # Prevent repeated API calls when error is received
 
-        offset = self._assert_offset(page, self.returns_per_req)
+        offset = self._assert_offset(page, self.images_per_req)
         params  = { 'key': self.key,
                     'gl':'uk',
                     'googlehost':'google.uk',
@@ -84,7 +138,7 @@ class GoogleCaller(APICaller):
                     'imageSize':self.img_size,
                     'filter':'1',
                     'imgType':'photo',
-                    'num':self.returns_per_req,
+                    'num':self.images_per_req,
                 }
         if offset > 0: params['start'] = offset # Offset must be between 1 and 90
 
@@ -109,6 +163,11 @@ class GoogleCaller(APICaller):
             except Exception as e: print(f"Unsaveable image: {search_result['link']}\n{str(e)}\n")
 
 class BingCaller(APICaller):
+    """Subclass for calling Google API calls & handling response.
+
+    See the following link for the API reference:
+    https://docs.microsoft.com/en-us/rest/api/cognitiveservices/bing-images-api-v7-reference
+    """    
     def __init__(self, api_key, data_root, returns_per_req):
         super().__init__('bing',
                          'https://api.cognitive.microsoft.com/bing/v7.0/images/search',
@@ -119,12 +178,12 @@ class BingCaller(APICaller):
     def download_images(self, query, page, search_grouping):
         if self.error_code: return 0 # Prevent repeated API calls when error is received        
 
-        offset = self._assert_offset(page, self.returns_per_req)
+        offset = self._assert_offset(page, self.images_per_req)
         headers = {'Ocp-Apim-Subscription-Key' : self.key}
         params  = { 'q': query,
                     # 'license': 'shareCommercially',
                     'imageType': 'photo',
-                    'count':self.returns_per_req,
+                    'count':self.images_per_req,
                     'offset':offset
                 }
 
@@ -151,6 +210,11 @@ class BingCaller(APICaller):
             except Exception as e: print(f"Unsaveable image: {search_result['contentUrl']}\n{str(e)}\n")
 
 class FlickrCaller(APICaller):
+    """Subclass for calling Flickr API calls & handling response.
+
+    Uses only the photo search API call and the image ID lookup. More info on params here:
+    https://www.flickr.com/services/api/flickr.photos.search.htm
+    """     
     def __init__(self, api_key, data_root, returns_per_req):
         super().__init__('flickr',
                          'https://api.flickr.com/services/rest/?',
@@ -161,7 +225,7 @@ class FlickrCaller(APICaller):
     def download_images(self, query, page, search_grouping):
         if self.error_code: return 0 # Prevent repeated API calls when error is received        
 
-        offset = self._assert_offset(page, self.returns_per_req)
+        offset = self._assert_offset(page, self.images_per_req)
         response = self.search_images(query, page)
         self._check_status_code(response.status_code)
         
@@ -192,12 +256,23 @@ class FlickrCaller(APICaller):
                             
             time.sleep(0.05) # Restricting API call frequency to be a good citizen
 
-    def search_images(self, query, page=1):
+    def search_images(self, query, page):
+        """Queries the Flickr API.
+
+        Args:
+            query (string): Image search query to search for.
+            page (int): The page index to start from.
+        
+        Returns:
+            The API response.
+
+        TODO: Generalize to other classes with params dict as input to supply.
+        """        
         search_url = self._create_method_url('flickr.photos.search')
         params = {  'api_key':self.key,
                     'text':query,
                     'tag_mode':'all',
-                    'per_page':self.returns_per_req,
+                    'per_page':self.images_per_req,
                     'page':str(page),
                     'sort':'relevance',
                     'media':'photos',
@@ -206,10 +281,17 @@ class FlickrCaller(APICaller):
                 }
         
         response = requests.get(search_url, params = params)
-
         return response
 
     def get_image_sizes(self, image_id):
+        """Queries the Flickr API for image formats of a given image ID.
+
+        Args:
+            image_id (string): The unique image identifier found in the API response.
+        
+        Returns:
+            A dict of all image formats.
+        """        
         size_url = self._create_method_url('flickr.photos.getSizes')
         params = {  'api_key':self.key,
                     'photo_id':image_id,
@@ -220,17 +302,46 @@ class FlickrCaller(APICaller):
         return response        
 
     def _get_highest_resolution_img(self, img_sizes):
-        # There has got to be a better way to find the highest resolution..
+        """For a given stack of URLs, gets the highest resolution image.
+
+        Does not check the actual resolution but instead uses the highest node number in the list,
+        which by default contains the highest resolution.
+
+        Args:
+            method (string): The method that the Flickr API has to execute.
+        
+        Returns:
+            The URL of the highest resolution image.
+
+        TODO: Find a more elegant solution.
+        """
         highest_res_node = [i for i,_ in enumerate(img_sizes['size'])][-1]
         highest_res_url = img_sizes['size'][highest_res_node]['source']
 
         return(highest_res_url)
 
     def _create_method_url(self, method):
+        """Appends the Flickr method to the Flickr API url.
+
+        Args:
+            method (string): The method that the Flickr API has to execute.
+        
+        Returns:
+            The Flickr method URL.
+        """           
         return f"{self.rest_url}method={method}"                
 
 
 def get_query_combinations(first_term, second_term):
+    """Search Thesaurus for synonyms, then create a list of two of all possible combinations.
+
+    Args:
+        first_term (string): First keyword to search for.
+        second_term (string): Second keyword to search for.
+    
+    Returns:
+        A list of all possible synonym-combinations of the two terms.
+    """        
     all_combinations = []
 
     synonyms_1 = th.Word(first_term).synonyms()
@@ -245,6 +356,18 @@ def get_query_combinations(first_term, second_term):
     return all_combinations
 
 def add_term_to_combinations(combinations, terms):
+    """For a given list with combinations, add an extra term to every list.
+
+    The input for terms can contain 1 or more word in the list. It will then create a new list
+    for every new possible combination.
+
+    Args:
+        combinations (list of lists): A list of N sublists containing search terms.
+        terms (list of strings): A list of N words to create new combination search terms with.
+    
+    Returns:
+        A new combination list containing the new set of possible combinations.
+    """        
     combos = []
     for term in terms:
         for combo in combinations:
