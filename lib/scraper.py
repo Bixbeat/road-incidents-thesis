@@ -18,6 +18,8 @@ class APICaller():
         self.data_root = data_root
         self.returns_per_req = returns_per_req # Max number of returns allowed per call
 
+        self.error_code = None
+
     def _save_image_file(self, image_bytes, path):
         with io.BytesIO(image_bytes.content) as f:
             f.seek(0)
@@ -39,6 +41,11 @@ class APICaller():
         assert(page >= 0)
         return(page * imgs_per_req)      
 
+    def _check_status_code(self, status_code):
+        if status_code != 200:
+            self.error_code = status_code
+            print(f'aborting further execution, error code {status_code} received for caller {self.source}')
+
 class GoogleCaller(APICaller):
     # https://stackoverflow.com/questions/34035422/google-image-search-says-api-no-longer-available
     def __init__(self, api_key, data_root, returns_per_req, cx):
@@ -51,6 +58,8 @@ class GoogleCaller(APICaller):
         self.img_size = 'medium'
 
     def download_images(self, query, page, search_grouping):
+        if self.error_code: return 0 # Prevent repeated API calls when error is received
+
         offset = self._assert_offset(page, self.returns_per_req)
         params  = { 'key': self.key,
                     'gl':'uk',
@@ -66,6 +75,8 @@ class GoogleCaller(APICaller):
         if offset > 0: params['start'] = offset # Offset must be between 1 and 90
 
         response = requests.get(self.rest_url, params=params)
+        self._check_status_code(response.status_code)
+
         search_results = response.json()
         
         out_dir = self._construct_output_dir(search_grouping, query)
@@ -91,6 +102,8 @@ class BingCaller(APICaller):
                          returns_per_req)
 
     def download_images(self, query, page, search_grouping):
+        if self.error_code: return 0 # Prevent repeated API calls when error is received        
+
         offset = self._assert_offset(page, self.returns_per_req)
         headers = {'Ocp-Apim-Subscription-Key' : self.key}
         params  = { 'q': query,
@@ -101,7 +114,9 @@ class BingCaller(APICaller):
                 }
 
         response = requests.get(self.rest_url, headers=headers, params=params)
-        search_results = response.json()
+        self._check_status_code(response.status_code)
+
+        search_results = response.json()        
         
         out_dir = self._construct_output_dir(search_grouping, query)
         self._create_dir_if_not_exist(out_dir)
@@ -126,10 +141,15 @@ class FlickrCaller(APICaller):
                          data_root,
                          returns_per_req)
 
-    def download_tagged_images(self, query, page, search_grouping):
+    def download_images(self, query, page, search_grouping):
+        if self.error_code: return 0 # Prevent repeated API calls when error is received        
+
         offset = self._assert_offset(page, self.returns_per_req)
         response = self.search_images(query, page)
-        photos = response.json()['photos']['photo']
+        self._check_status_code(response.status_code)
+
+        search_results = response.json()
+        photos = search_results['photos']['photo']        
 
         out_dir = self._construct_output_dir(search_grouping, query)
         self._create_dir_if_not_exist(out_dir)     
@@ -137,8 +157,8 @@ class FlickrCaller(APICaller):
         response_pickle = out_dir + f'/{query}_{offset}.pickle'
         self._store_response(response, response_pickle)
 
-        for i,_ in enumerate(photos):
-            image_id = photos[i]['id']
+        for _,photo in enumerate(photos):
+            image_id = photo['id']
             sizes_response  = self.get_image_sizes(image_id)
             img_sizes = sizes_response.json()['sizes']
         
@@ -166,6 +186,7 @@ class FlickrCaller(APICaller):
                 }
         
         response = requests.get(search_url, params = params)
+
         return response
 
     def get_image_sizes(self, image_id):

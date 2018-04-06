@@ -9,7 +9,7 @@ from lib import scraper
 from lib.scraper import GoogleCaller, FlickrCaller, BingCaller
 
 def submit_query(api_caller, query, search_grouping, page):
-    api_caller.download_images(query, search_grouping = search_grouping, page = 0)
+    api_caller.download_images(query, search_grouping = search_grouping, page = page)
 
 if __name__ == '__main__':
 
@@ -24,7 +24,7 @@ if __name__ == '__main__':
     combinations = scraper.add_term_to_combinations(road_types, snow_types)
 
     # Define search parameters
-    DATA_ROOT = '/media/alex/A4A034E0A034BB1E/incidents-thesis'
+    DATA_ROOT = '/media/alex/A4A034E0A034BB1E/incidents-thesis/data'
     search_grouping = "snowy_road"    
 
 ## Bing
@@ -33,7 +33,7 @@ if __name__ == '__main__':
 
 ## Google
     GOOGLE_API_KEY = u'' # From https://console.developers.google.com
-    CUSTOM_ENGINE = '013675800614641398741:wwg9y3xxkj0' # Create a custom search engine at https://cse.google.com
+    CUSTOM_ENGINE = '' # Create a custom search engine at https://cse.google.com
     google = GoogleCaller(GOOGLE_API_KEY, DATA_ROOT, returns_per_req = 10, cx = CUSTOM_ENGINE)
 
 ## Flickr
@@ -42,6 +42,13 @@ if __name__ == '__main__':
 
 ## Querying
     for combination in combinations:
-        query = f"{combination[0]} {combination[1]}"                  
-        for i in range(10):
-            submit_query(google, query, search_grouping, page = i)    
+        if all(v is not None for v in [bing.error_code, google.error_code, flickr.error_code]):
+            print("Errors exist in all API callers, cancelling search")
+            break
+
+        query = f"{combination[0]} {combination[1]}"
+        submit_query(bing, query, search_grouping, page = 0)
+        submit_query(flickr, query, search_grouping, page = 0)
+
+        for i in range(10): # 10 imgs per call, max index is 100
+            submit_query(google, query, search_grouping, page = i)
