@@ -5,10 +5,19 @@ Created on Mon Mar 19 11:04:33 2018
 
 @author: alex
 """
+
 from lib import scraper
 from lib.scraper import GoogleCaller, FlickrCaller, BingCaller
 
 def submit_query(api_caller, query, search_grouping, page):
+    """Submit a query to the specified target
+
+    Args
+        apicaller(APICaller): API class of the target.
+        query (string): Image search query to search for.
+        search_gourping (string): Folder grouping for search results.
+        page (int): The page index to start from.
+    """    
     api_caller.download_images(query, search_grouping = search_grouping, page = page)
 
 if __name__ == '__main__':

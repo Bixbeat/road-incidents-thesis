@@ -11,7 +11,16 @@ from PIL import Image
 from lib.thesaurusScraper import thesaurus as th
 
 class APICaller():
+    """General API image searching wrapper.
+    """    
     def __init__(self, source, rest_url, api_key, data_root, returns_per_req):
+        """
+        Args:
+            source (string): Description for saving purposes.
+            rest_url (string): Target path for the API URL
+            api_key(string): The API key supplied for the API
+
+        """        
         self.rest_url = rest_url
         self.source = source
         self.key = api_key
@@ -44,7 +53,12 @@ class APICaller():
     def _check_status_code(self, status_code):
         if status_code != 200:
             self.error_code = status_code
-            print(f'aborting further execution, error code {status_code} received for caller {self.source}')
+            print(f'aborting further execution, error code {status_code} received for {self.source} caller')
+    
+    def _check_if_key_exists(self, key, results):
+        if not key in results.keys():
+            print("Response contains no items, aborting")
+            return False
 
 class GoogleCaller(APICaller):
     # https://stackoverflow.com/questions/34035422/google-image-search-says-api-no-longer-available
@@ -85,6 +99,7 @@ class GoogleCaller(APICaller):
         response_pickle = out_dir + f'/{query}_{self.img_size}_{offset}.pickle'
         self._store_response(response, response_pickle)
 
+        if self._check_if_key_exists('items',search_results) == False:return 0
         for i, search_result in enumerate(search_results['items']):
             try: image_bytes = requests.get(search_result['link'], timeout=10)
             except Exception as e: print(f"Unreachable URL: {search_result['link']}\n{str(e)}\n")
@@ -115,6 +130,7 @@ class BingCaller(APICaller):
 
         response = requests.get(self.rest_url, headers=headers, params=params)
         self._check_status_code(response.status_code)
+        if self.error_code: return 0 # Prevent repeated API calls when error is received
 
         search_results = response.json()        
         
@@ -124,6 +140,7 @@ class BingCaller(APICaller):
         response_pickle = out_dir + f'/{query}_{offset}.pickle'
         self._store_response(response, response_pickle)
 
+        if self._check_if_key_exists('value',search_results) == False: return 0
         for search_result in search_results['value']:
             image_id = search_result['imageId']
             try: image_bytes = requests.get(search_result['contentUrl'], timeout=10)
@@ -147,16 +164,18 @@ class FlickrCaller(APICaller):
         offset = self._assert_offset(page, self.returns_per_req)
         response = self.search_images(query, page)
         self._check_status_code(response.status_code)
+        
 
-        search_results = response.json()
-        photos = search_results['photos']['photo']        
+        search_results = response.json()        
 
         out_dir = self._construct_output_dir(search_grouping, query)
         self._create_dir_if_not_exist(out_dir)     
 
         response_pickle = out_dir + f'/{query}_{offset}.pickle'
         self._store_response(response, response_pickle)
-
+        
+        if self._check_if_key_exists('photos',search_results) == False: return 0
+        photos = search_results['photos']['photo']            
         for _,photo in enumerate(photos):
             image_id = photo['id']
             sizes_response  = self.get_image_sizes(image_id)
@@ -171,13 +190,14 @@ class FlickrCaller(APICaller):
                 try: self._save_image_file(image_bytes, image_path)
                 except Exception as e: print(f"Unsaveable image: {image_bytes}\n{str(e)}\n")
                             
-            time.sleep(0.2) # Restricting API call frequency to be a good citizen
+            time.sleep(0.05) # Restricting API call frequency to be a good citizen
 
     def search_images(self, query, page=1):
         search_url = self._create_method_url('flickr.photos.search')
         params = {  'api_key':self.key,
                     'text':query,
                     'tag_mode':'all',
+                    'per_page':self.returns_per_req,
                     'page':str(page),
                     'sort':'relevance',
                     'media':'photos',
