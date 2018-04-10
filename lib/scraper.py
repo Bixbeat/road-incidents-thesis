@@ -12,6 +12,8 @@ from lib.thesaurusScraper import thesaurus as th
 
 class APICaller():
     """General API image searching wrapper.
+
+    Base class containing common functionality between image search APIs.
     """    
     def __init__(self, source, rest_url, api_key, data_root, images_per_req):
         """
@@ -96,7 +98,7 @@ class APICaller():
             self.error_code = status_code
             print(f'aborting further execution, error code {status_code} received for {self.source} caller')
     
-    def _check_if_key_exists(self, key, results):
+    def _check_if_key_in_dict(self, key, results):
         """Check whether a given key exists in a dictionary.
 
         Args:
@@ -126,7 +128,8 @@ class GoogleCaller(APICaller):
         self.img_size = 'medium'
 
     def download_images(self, query, page, search_grouping):
-        if self.error_code: return 0 # Prevent repeated API calls when error is received
+        if self.error_code:
+            return 0 # Prevent repeated API calls when error is received
 
         offset = self._assert_offset(page, self.images_per_req)
         params  = { 'key': self.key,
@@ -140,7 +143,8 @@ class GoogleCaller(APICaller):
                     'imgType':'photo',
                     'num':self.images_per_req,
                 }
-        if offset > 0: params['start'] = offset # Offset must be between 1 and 90
+        if offset > 0:
+            params['start'] = offset # Offset must be between 1 and 90
 
         response = requests.get(self.rest_url, params=params)
         self._check_status_code(response.status_code)
@@ -153,14 +157,20 @@ class GoogleCaller(APICaller):
         response_pickle = out_dir + f'/{query}_{self.img_size}_{offset}.pickle'
         self._store_response(response, response_pickle)
 
-        if self._check_if_key_exists('items',search_results) == False:return 0
+        if self._check_if_key_in_dict('items',search_results) == False:
+            return None
         for i, search_result in enumerate(search_results['items']):
-            try: image_bytes = requests.get(search_result['link'], timeout=10)
-            except Exception as e: print(f"Unreachable URL: {search_result['link']}\n{str(e)}\n")
+            try:
+                image_bytes = requests.get(search_result['link'], timeout=10)
+            except Exception as e:
+                print(f"Unreachable URL: {search_result['link']}\n{str(e)}\n")
 
             image_path = out_dir + f'/{self.img_size}_{offset+i+1}.png'
-            try: self._save_image_file(image_bytes, image_path)
-            except Exception as e: print(f"Unsaveable image: {search_result['link']}\n{str(e)}\n")
+
+            try:
+                self._save_image_file(image_bytes, image_path)
+            except Exception as e:
+                print(f"Unsaveable image: {search_result['link']}\n{str(e)}\n")
 
 class BingCaller(APICaller):
     """Subclass for calling Google API calls & handling response.
@@ -176,7 +186,8 @@ class BingCaller(APICaller):
                          returns_per_req)
 
     def download_images(self, query, page, search_grouping):
-        if self.error_code: return 0 # Prevent repeated API calls when error is received        
+        if self.error_code:
+            return None # Prevent repeated API calls when error is received        
 
         offset = self._assert_offset(page, self.images_per_req)
         headers = {'Ocp-Apim-Subscription-Key' : self.key}
@@ -189,7 +200,9 @@ class BingCaller(APICaller):
 
         response = requests.get(self.rest_url, headers=headers, params=params)
         self._check_status_code(response.status_code)
-        if self.error_code: return 0 # Prevent repeated API calls when error is received
+
+        if self.error_code:
+            return None # Prevent repeated API calls when error is received
 
         search_results = response.json()        
         
@@ -199,15 +212,21 @@ class BingCaller(APICaller):
         response_pickle = out_dir + f'/{query}_{offset}.pickle'
         self._store_response(response, response_pickle)
 
-        if self._check_if_key_exists('value',search_results) == False: return 0
+        if self._check_if_key_in_dict('value',search_results) == False: return 0
         for search_result in search_results['value']:
             image_id = search_result['imageId']
-            try: image_bytes = requests.get(search_result['contentUrl'], timeout=10)
-            except Exception as e: print(f"Unreachable URL: {search_result['contentUrl']}\n{str(e)}\n")
+
+            try:
+                image_bytes = requests.get(search_result['contentUrl'], timeout=10)
+            except Exception as e:
+                print(f"Unreachable URL: {search_result['contentUrl']}\n{str(e)}\n")
 
             image_path = out_dir + f'/{image_id}.png'
-            try: self._save_image_file(image_bytes, image_path)
-            except Exception as e: print(f"Unsaveable image: {search_result['contentUrl']}\n{str(e)}\n")
+
+            try:
+                self._save_image_file(image_bytes, image_path)
+            except Exception as e:
+                print(f"Unsaveable image: {search_result['contentUrl']}\n{str(e)}\n")
 
 class FlickrCaller(APICaller):
     """Subclass for calling Flickr API calls & handling response.
@@ -223,7 +242,8 @@ class FlickrCaller(APICaller):
                          returns_per_req)
 
     def download_images(self, query, page, search_grouping):
-        if self.error_code: return 0 # Prevent repeated API calls when error is received        
+        if self.error_code:
+            return None # Prevent repeated API calls when error is received        
 
         offset = self._assert_offset(page, self.images_per_req)
         response = self.search_images(query, page)
@@ -238,7 +258,9 @@ class FlickrCaller(APICaller):
         response_pickle = out_dir + f'/{query}_{offset}.pickle'
         self._store_response(response, response_pickle)
         
-        if self._check_if_key_exists('photos',search_results) == False: return 0
+        if self._check_if_key_in_dict('photos',search_results) == False:
+            return None
+
         photos = search_results['photos']['photo']            
         for _,photo in enumerate(photos):
             image_id = photo['id']
@@ -246,15 +268,21 @@ class FlickrCaller(APICaller):
             img_sizes = sizes_response.json()['sizes']
         
             if not img_sizes['candownload'] == 0:
-                highest_res_url = self._get_highest_resolution_img(img_sizes)             
-                try: image_bytes = image_bytes = requests.get(highest_res_url, timeout=10)
-                except Exception as e: print(f"Unreachable URL: {highest_res_url}\n{str(e)}\n")
+                highest_res_url = self._get_image_url(img_sizes, resolution = 7)
+
+                try:
+                    image_bytes = image_bytes = requests.get(highest_res_url, timeout=10)
+                except Exception as e:
+                    print(f"Unreachable URL: {highest_res_url}\n{str(e)}\n")
 
                 image_path = out_dir + f'/{image_id}.png'
-                try: self._save_image_file(image_bytes, image_path)
-                except Exception as e: print(f"Unsaveable image: {image_bytes}\n{str(e)}\n")
+
+                try:
+                    self._save_image_file(image_bytes, image_path)
+                except Exception as e:
+                    print(f"Unsaveable image: {image_bytes}\n{str(e)}\n")
                             
-            time.sleep(0.05) # Restricting API call frequency to be a good citizen
+            time.sleep(0.2) # Restricting API call frequency to be a good citizen
 
     def search_images(self, query, page):
         """Queries the Flickr API.
@@ -301,22 +329,26 @@ class FlickrCaller(APICaller):
         response = requests.get(size_url, params = params)
         return response        
 
-    def _get_highest_resolution_img(self, img_sizes):
-        """For a given stack of URLs, gets the highest resolution image.
+    def _get_image_url(self, img_sizes, resolution = 7):
+        """For a given stack of URLs, gets the specified resolution image.
 
         Does not check the actual resolution but instead uses the highest node number in the list,
-        which by default contains the highest resolution.
+        which by default contains the highest resolution. If the resolution is greater than the specified
+        resolution, returns the specified resolution.
 
         Args:
             method (string): The method that the Flickr API has to execute.
+            resolution (int): The resolution specified by the node. Lower values are lower resolutions.
         
         Returns:
-            The URL of the highest resolution image.
+            The URL of the specified resolution image, or lower res if not applicable.
 
         TODO: Find a more elegant solution.
         """
-        highest_res_node = [i for i,_ in enumerate(img_sizes['size'])][-1]
-        highest_res_url = img_sizes['size'][highest_res_node]['source']
+        image_node = [i for i,_ in enumerate(img_sizes['size'])][-1] #Get highest
+        if image_node > resolution:
+            image_node = resolution # Reduce the 
+        highest_res_url = img_sizes['size'][image_node]['source']
 
         return(highest_res_url)
 
