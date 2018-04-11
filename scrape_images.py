@@ -31,21 +31,23 @@ if __name__ == '__main__':
     # snow_types = ['snow','blizzard']
     # landcovers = ['forest','countryside','city','mountain']
     # combinations = scraper.add_term_to_combinations([['car'],['lorry'],['motorcycle'],['highway']], ['crash', 'accident'])
-    combinations = scraper.add_term_to_combinations(road_types, ['collapse','sinkhole'])
+    combinations = scraper.add_term_to_combinations(road_types, ['flooding on','submerged', 'overflowed'])
     # combinations = scraper.add_term_to_combinations(road_types, snow_types)[2:]
 
     # Define search parameters
     DATA_ROOT = '/media/alex/A4A034E0A034BB1E/incidents-thesis/data'
-    search_grouping = 'collapse'    
+    search_grouping = 'flooding'    
 
 ## Bing
     BING_API_KEY = u'' # From https://docs.microsoft.com/en-us/rest/api/cognitiveservices/bing-images-api-v7-reference 
     bing = BingCaller(BING_API_KEY, DATA_ROOT, returns_per_req = 100)
 
 ## Google
-    GOOGLE_API_KEY = u''
+    GOOGLE_API_KEY = u'' # From https://console.developers.google.com
+    GOOGLE_API_KEY2 = u''
+    GOOGLE_API_KEY3 = u''
     CUSTOM_ENGINE = u'' # Create a custom search engine at https://cse.google.com
-    google = GoogleCaller(GOOGLE_API_KEY, DATA_ROOT, returns_per_req = 10, cx = CUSTOM_ENGINE)
+    google = GoogleCaller(GOOGLE_API_KEY2, DATA_ROOT, returns_per_req = 10, cx = CUSTOM_ENGINE)
 
 ## Flickr
     FLICKR_API_KEY = u'' # From https://www.flickr.com/services/apps/
@@ -58,8 +60,13 @@ if __name__ == '__main__':
             break
 
         query = f"{combination[0]} {combination[1]}"
+
+        print(f"Querying for '{query}' using Bing")
         submit_query(bing, query, search_grouping, page = 0)
+
+        print(f"Querying for '{query}' using Flickr")
         submit_query(flickr, query, search_grouping, page = 0)
 
+        print(f"Querying for '{query}' using Google")
         for i in range(10): # 10 imgs per call, max index is 100
             submit_query(google, query, search_grouping, page = i)

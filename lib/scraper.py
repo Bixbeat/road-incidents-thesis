@@ -265,24 +265,28 @@ class FlickrCaller(APICaller):
         for _,photo in enumerate(photos):
             image_id = photo['id']
             sizes_response  = self.get_image_sizes(image_id)
-            img_sizes = sizes_response.json()['sizes']
-        
-            if not img_sizes['candownload'] == 0:
-                highest_res_url = self._get_image_url(img_sizes, resolution = 7)
 
-                try:
-                    image_bytes = image_bytes = requests.get(highest_res_url, timeout=10)
-                except Exception as e:
-                    print(f"Unreachable URL: {highest_res_url}\n{str(e)}\n")
+            if self._check_if_key_in_dict('sizes',sizes_response.json()) != False:
+                img_sizes = sizes_response.json()['sizes']
+            
+                if not img_sizes['candownload'] == 0:
+                    highest_res_url = self._get_image_url(img_sizes, resolution = 7)
 
-                image_path = out_dir + f'/{image_id}.png'
+                    try:
+                        image_bytes = image_bytes = requests.get(highest_res_url, timeout=10)
+                    except Exception as e:
+                        print(f"Unreachable URL: {highest_res_url}\n{str(e)}\n")
 
-                try:
-                    self._save_image_file(image_bytes, image_path)
-                except Exception as e:
-                    print(f"Unsaveable image: {image_bytes}\n{str(e)}\n")
-                            
-            time.sleep(0.2) # Restricting API call frequency to be a good citizen
+                    image_path = out_dir + f'/{image_id}.png'
+
+                    try:
+                        self._save_image_file(image_bytes, image_path)
+                    except Exception as e:
+                        print(f"Unsaveable image: {image_bytes}\n{str(e)}\n")
+                                
+                time.sleep(0.2) # Restricting API call frequency to be a good citizen
+            else:
+                print("Empty sizes dictionary, skipping.")
 
     def search_images(self, query, page):
         """Queries the Flickr API.
