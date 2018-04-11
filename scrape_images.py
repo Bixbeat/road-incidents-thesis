@@ -6,8 +6,8 @@ Created on Mon Mar 19 11:04:33 2018
 @author: alex
 """
 
-from lib import scraper
-from lib.scraper import GoogleCaller, FlickrCaller, BingCaller
+from data_collection import scraper
+from data_collection.scraper import GoogleCaller, FlickrCaller, BingCaller
 
 def submit_query(api_caller, query, search_grouping, page):
     """Submit a query to the specified target.
@@ -31,7 +31,7 @@ if __name__ == '__main__':
     # snow_types = ['snow','blizzard']
     # landcovers = ['forest','countryside','city','mountain']
     # combinations = scraper.add_term_to_combinations([['car'],['lorry'],['motorcycle'],['highway']], ['crash', 'accident'])
-    combinations = scraper.add_term_to_combinations(road_types, ['flooding on','submerged', 'overflowed'])
+    combinations = scraper.add_term_to_combinations(road_types, ['flooding on','submerged', 'overflowed'])[3:]
     # combinations = scraper.add_term_to_combinations(road_types, snow_types)[2:]
 
     # Define search parameters
@@ -44,10 +44,8 @@ if __name__ == '__main__':
 
 ## Google
     GOOGLE_API_KEY = u'' # From https://console.developers.google.com
-    GOOGLE_API_KEY2 = u''
-    GOOGLE_API_KEY3 = u''
     CUSTOM_ENGINE = u'' # Create a custom search engine at https://cse.google.com
-    google = GoogleCaller(GOOGLE_API_KEY2, DATA_ROOT, returns_per_req = 10, cx = CUSTOM_ENGINE)
+    google = GoogleCaller(GOOGLE_API_KEY, DATA_ROOT, returns_per_req = 10, cx = CUSTOM_ENGINE)
 
 ## Flickr
     FLICKR_API_KEY = u'' # From https://www.flickr.com/services/apps/

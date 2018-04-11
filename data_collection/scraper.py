@@ -8,7 +8,7 @@ import requests
 import urllib
 from PIL import Image
 
-from lib.thesaurusScraper import thesaurus as th
+from data_collection.thesaurusScraper import thesaurus as th
 
 class APICaller():
     """General API image searching wrapper.
@@ -109,7 +109,7 @@ class APICaller():
             False if the key does not exist
         """           
         if not key in results.keys():
-            print(f"Response does not contain key {key}, aborting")
+            print(f"Response dict does not contain key {key}")
             return False
 
 class GoogleCaller(APICaller):
