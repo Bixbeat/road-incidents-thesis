@@ -2,5 +2,9 @@
 *.png
 *.jpg
 
+## Directories
 *data
 *__pycache__
+
+## Workspaces
+*.code-workspace
