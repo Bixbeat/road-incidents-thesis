@@ -9,6 +9,7 @@ import urllib
 from PIL import Image
 
 from data_management.thesaurusScraper import thesaurus as th
+from data_management import data_utils
 
 class APICaller():
     """General API image searching wrapper.
@@ -43,15 +44,6 @@ class APICaller():
             f.seek(0)
             with Image.open(f) as img:
                 img.save(path)
-
-    def _create_dir_if_not_exist(self, directory):
-        """Creates a directory if the path does not yet exist.
-
-        Args:
-            directory (string): The directory to create.
-        """          
-        if not os.path.exists(directory):
-            os.makedirs(directory)
 
     def _construct_output_dir(self, search_grouping, query):
         """Creates a directory path for a search.
@@ -152,7 +144,7 @@ class GoogleCaller(APICaller):
         search_results = response.json()
         
         out_dir = self._construct_output_dir(search_grouping, query)
-        self._create_dir_if_not_exist(out_dir)
+        data_utils.create_dir_if_not_exist(out_dir)
 
         response_pickle = out_dir + f'/{query}_{self.img_size}_{offset}.pickle'
         self._store_response(response, response_pickle)
@@ -207,7 +199,7 @@ class BingCaller(APICaller):
         search_results = response.json()        
         
         out_dir = self._construct_output_dir(search_grouping, query)
-        self._create_dir_if_not_exist(out_dir)
+        data_utils.create_dir_if_not_exist(out_dir)
 
         response_pickle = out_dir + f'/{query}_{offset}.pickle'
         self._store_response(response, response_pickle)
@@ -253,7 +245,7 @@ class FlickrCaller(APICaller):
         search_results = response.json()        
 
         out_dir = self._construct_output_dir(search_grouping, query)
-        self._create_dir_if_not_exist(out_dir)     
+        data_utils.create_dir_if_not_exist(out_dir)  
 
         response_pickle = out_dir + f'/{query}_{offset}.pickle'
         self._store_response(response, response_pickle)
