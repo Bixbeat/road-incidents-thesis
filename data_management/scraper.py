@@ -8,7 +8,7 @@ import requests
 import urllib
 from PIL import Image
 
-from data_collection.thesaurusScraper import thesaurus as th
+from data_management.thesaurusScraper import thesaurus as th
 
 class APICaller():
     """General API image searching wrapper.

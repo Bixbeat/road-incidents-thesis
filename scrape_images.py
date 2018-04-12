@@ -6,8 +6,8 @@ Created on Mon Mar 19 11:04:33 2018
 @author: alex
 """
 
-from data_collection import scraper
-from data_collection.scraper import GoogleCaller, FlickrCaller, BingCaller
+from data_management import scraper
+from data_management.scraper import GoogleCaller, FlickrCaller, BingCaller
 
 def submit_query(api_caller, query, search_grouping, page):
     """Submit a query to the specified target.
@@ -27,12 +27,10 @@ if __name__ == '__main__':
     # extra_terms = ["city"] # Or add a list of synonyms, but this will create very many combinations
     # combinations = scraper.add_term_to_combinations(combinations, extra_terms)
 
-    road_types = [['road'],['highway'],['street'],['route']]
-    # snow_types = ['snow','blizzard']
+    road_types = ['road','highway','street','route']
     # landcovers = ['forest','countryside','city','mountain']
     # combinations = scraper.add_term_to_combinations([['car'],['lorry'],['motorcycle'],['highway']], ['crash', 'accident'])
-    combinations = scraper.add_term_to_combinations(road_types, ['flooding on','submerged', 'overflowed'])[3:]
-    # combinations = scraper.add_term_to_combinations(road_types, snow_types)[2:]
+    combinations = scraper.add_term_to_combinations([['flooding on'],['submerged'], ['overflowed']], road_types)
 
     # Define search parameters
     DATA_ROOT = '/media/alex/A4A034E0A034BB1E/incidents-thesis/data'
