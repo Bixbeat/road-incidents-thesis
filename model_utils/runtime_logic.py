@@ -1,5 +1,5 @@
-from processing_utils import visualise
-from processing_utils import analysis_utils
+from model_utils import visualise
+from model_utils import analysis_utils
 
 import os
 from os import path
@@ -69,7 +69,7 @@ class ImageAnalysis(object):
         return(f'{self.root_dir}/loss/{run_name}/{split}.csv')
 
     def update_loss_values(self, all_recorded_loss, avg_epoch_loss, loss_plot_window):
-        np.append(all_recorded_loss, avg_epoch_train_loss)
+        np.append(all_recorded_loss, avg_epoch_loss)
         self.vis_data.custom_update_loss_plot(loss_plot_window, all_recorded_loss, title="<b>Training loss</b>", color='#0000ff')
         
     def save_loss_if_enabled(self, loss_file, run_name, avg_epoch_train_loss, epoch):
@@ -162,8 +162,8 @@ class AnnotatedImageAnalysis(ImageAnalysis):
                     image = images[0]
                     pred = preds[0]
                     
-                    img, pred = visualise.encoded_img_and_lbl_to_data(image, pred, self.means, self.sdevs)
-                    visualise.plot_pairs(img, pred)
+                    # img, pred = visualise.encoded_img_and_lbl_to_data(image, pred, self.means, self.sdevs)
+                    # visualise.plot_pairs(img, pred)
 
             epoch_now = epoch+1
 
@@ -217,8 +217,8 @@ class AnnotatedImageAnalysis(ImageAnalysis):
                 image = images[0]
                 pred = preds[0]
                 
-                img, pred = visualise.encoded_img_and_lbl_to_data(image, pred, self.means, self.sdevs, self.label_colours)
-                visualise.plot_pairs(img, pred)
+                # img, pred = visualise.encoded_img_and_lbl_to_data(image, pred, self.means, self.sdevs, self.label_colours)
+                # visualise.plot_pairs(img, pred)
             
         # Record validation loss & determine if model is best on val set
         avg_epoch_val_loss = epoch_val_loss/(i+1) 
