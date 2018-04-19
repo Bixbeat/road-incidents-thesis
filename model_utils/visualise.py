@@ -7,16 +7,16 @@ import matplotlib.pyplot as plt
 
 def plot_pairs(image, label):
     """Takes an image tensor and its reconstruction vars, and
-    argmaxed softmax predictions to create a 1x2 comparison plot."""    
-    _, (imgplot, lblplot) = plt.subplots(1,2, figsize=(12, 6))
+    argmaxed softmax predictions to create a 1x2 comparison plot."""
+    _, (imgplot, lblplot) = plt.subplots(1, 2, figsize=(12, 6))
     imgplot.imshow(image, aspect='auto')
     imgplot.grid(color='r', linestyle='dashed', alpha=0.75)
 
     lblplot.imshow(label, aspect='auto')
     lblplot.grid(color='r', linestyle='dashed', alpha=0.75)                
-    
+
     plt.show(block=False)
-    
+
 def encoded_img_and_lbl_to_data(image, predictions, means, sdevs, label_colours):
     """For a given image and label pair, reconstruct both into
     images"""
@@ -54,7 +54,7 @@ def colour_lbl(tensor, colours):
 def decode_image(tensor, mean, sdev):
     """For a given normalized image tensor, reconstructs
     the image by undoing the normalization and transforming
-    the tensor to and image"""
+    the tensor to an image"""
     transposed_tensor = tensor.numpy().transpose((1, 2, 0))
     unnormed_img = np.array(sdev) * transposed_tensor + np.array(mean)
     image = np.clip(unnormed_img, 0, 1)
@@ -63,18 +63,20 @@ def decode_image(tensor, mean, sdev):
 class Visualiser(object):
     def __init__(self):
         self.vis = visdom.Visdom()
-        
         self.start_time = None
         self.avg_samples_per_sec = {}
+
     def vis_plot_loss(self,title):
         loss_window = self.vis.line(X=torch.zeros((1,)).cpu(),
-                               Y=torch.zeros((1)).cpu(),
-                               opts=dict(xlabel='epoch',
-                                         ylabel='Loss',
-                                         title=title,
-                                         legend=['Loss']))
+                                    Y=torch.zeros((1)).cpu(),
+                                    opts=dict(xlabel='epoch',
+                                              ylabel='Loss',
+                                              title=title,
+                                              legend=['Loss']))
         return loss_window
-    
+
+    torch.zeros(2, 3)
+
     def vis_create_timetracker(self, current_time):
         self.start_time = current_time
         timetracker = self.vis.text("<b>Starting time:</b> {}".format(self.start_time.replace(microsecond=0)))
@@ -166,7 +168,10 @@ class Visualiser(object):
         self.vis.images(img, win=windows[0], opts=dict(title=title))
         self.vis.images(lbl, win=windows[1], opts=dict(title=title))
         self.vis.images(pred,win=windows[2], opts=dict(title=title))
-        
+
+    def close_all_plots(self):
+        self.vis.close(win=None)
+
 def _remove_microseconds(time_delta):
     return time_delta - dt.timedelta(microseconds=time_delta.microseconds)
             
@@ -195,6 +200,3 @@ if __name__ == '__main__':
     epoch_time = epoch_end-epoch_start
     epoch_spd = epoch_time/10
     visualize_loss.update_timer("Training",timebox, epoch_start, epoch_time, epoch_spd)
-    
-    
-    
