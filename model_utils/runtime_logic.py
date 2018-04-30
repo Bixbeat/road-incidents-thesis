@@ -68,7 +68,6 @@ class ImageAnalysis(object):
         return(f'{self.root_dir}/loss/{run_name}/{split}.csv')
 
     def update_loss_values(self, all_recorded_loss, avg_epoch_loss, loss_plot_window):
-        np.append(all_recorded_loss, avg_epoch_loss)
         self.vis_data.custom_update_loss_plot(loss_plot_window, all_recorded_loss, title="<b>Training loss</b>", color='#0000ff')
         
     def save_loss_if_enabled(self, loss_file, run_name, avg_epoch_train_loss, epoch):
@@ -122,6 +121,8 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         --l_rate_decay_epoch, type=int      'Epoch at which decay should occur'
         --w_decay,            type=float    'Weight decay'
         """
+        self.initialize_visualisation()
+        
         # Setup loss
         if self.store_loss is True:
             data_utils.create_dir_if_not_exist(f'{self.root_dir}/loss/{args.run_name}')
@@ -158,7 +159,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
 
                 if (i+1) % args.report_interval == 0:
                     print(f'Train {epoch+1}: [{i} of {len(self.train_loader)}] : {epoch_train_loss/(i+1):.4f}')
-
+                    break
                     # CONTINUE HERE
                     # img, pred = visualise.encoded_img_and_lbl_to_data(image, pred, self.means, self.sdevs)
                     # visualise.plot_pairs(img, pred)
@@ -167,9 +168,11 @@ class AnnotatedImageAnalysis(ImageAnalysis):
 
             # Store loss
             avg_epoch_train_loss = epoch_train_loss/(i+1)
-            self.update_loss_values(self.all_train_loss, avg_epoch_train_loss, self.train_loss_window) 
+
+            self.all_train_loss = np.append(self.all_val_loss, avg_epoch_train_loss)
+            self.vis_data.custom_update_loss_plot(self.train_loss_window, self.all_train_loss, title="<b>Train loss</b>", color="#0000ff")
+
             self.save_loss_if_enabled(self.train_loss_file, args.run_name, avg_epoch_train_loss, epoch_now)
-            self.all_train_loss = np.append(self.all_train_loss, avg_epoch_train_loss)
 
             # Timekeeping
             total_num_samples = i+1
@@ -209,7 +212,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
 
             if (i+1) % args.report_interval == 0:
                 print(f"Val [{i} of {len(self.val_loader)}] : {epoch_val_loss/(i+1):.4f}")
-
+                break
                 # Plot predictions
                 # preds = analysis_utils.get_predictions(outputs)
                 # image = images[0]
@@ -230,8 +233,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         self.vis_data.custom_update_loss_plot(self.val_loss_window, self.all_val_loss, title="<b>Validation loss</b>")
 
         # Store loss
-        epoch_now = len(self.all_val_loss)-1
-        self.update_loss_values(self.all_val_loss, avg_epoch_val_loss, self.val_loss_window)
+        epoch_now = len(self.all_val_loss)
         self.save_loss_if_enabled(self.val_loss_file, args.run_name, avg_epoch_val_loss, epoch_now)
 
         # Timekeeping
