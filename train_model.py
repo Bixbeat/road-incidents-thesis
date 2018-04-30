@@ -13,7 +13,7 @@ from torchvision.transforms import Compose, Normalize, ToTensor
 from data_management import image_manipulations as i_manips
 from model_utils import analysis_utils
 from model_utils import runtime_logic
-        
+
 if __name__ == "__main__":
     # Fix conda slow loading https://github.com/pytorch/pytorch/issues/537    
 

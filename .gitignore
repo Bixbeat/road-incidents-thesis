@@ -5,6 +5,8 @@
 ## Directories
 *data
 *__pycache__
+*outputs
+*data_management/data_cleaning
 
 ## Workspaces
 *.code-workspace

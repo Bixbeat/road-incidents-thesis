@@ -87,7 +87,6 @@ class Visualiser(object):
         img_window = self.vis.images(np.random.rand(3, 4, 4))
         return img_window
 
-
     def custom_update_loss_plot(self, loss_window, loss, color='#ffa500', marker_size=3, title='plot'):
         """For a given visdom window, creates a plot for a single loss trace"""
         x_axis = [i for i,_ in enumerate(loss)]
@@ -159,7 +158,7 @@ class Visualiser(object):
                    avg_spd = np.mean(self.avg_samples_per_sec[title]))
         self.vis.text(update_text, time_textbox)
         
-    def vis_update_images(self, windows, img_content, title):
+    def vis_update_images(self, window, images, labels):
         """UNUSED: used to plot images to Visdom"""
         img = img_content[0]
         lbl =  img_content[1]
