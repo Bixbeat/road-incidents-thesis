@@ -72,7 +72,7 @@ def sync_img_and_lbls(root_dir, src_data_root, img_path, lbl_path):
         file = os.path.basename(file_path)
         missing_img = root_dir + src_data_root + "tiles/" + file
         copyfile(missing_img, root_dir + img_path + '/' + file)
-
+    
 if __name__ == "__main__":
     # Get normalize parameters
     imgs = get_images("/home/anteagroup/Documents/deeplearning/code/bag_project_p2/data/images/train/")
