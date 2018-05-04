@@ -3,7 +3,7 @@ from io import BytesIO
 import os.path
 import pickle
 import time
-import requests 
+import requests
 
 import urllib
 from PIL import Image
@@ -15,7 +15,7 @@ class APICaller():
     """General API image searching wrapper.
 
     Base class containing common functionality between image search APIs.
-    """    
+    """
     def __init__(self, source, rest_url, api_key, data_root, images_per_req):
         """
         Args:
@@ -43,6 +43,7 @@ class APICaller():
         with io.BytesIO(image_bytes.content) as f:
             f.seek(0)
             with Image.open(f) as img:
+                img = img.convert("RGB")
                 img.save(path)
 
     def _construct_output_dir(self, search_grouping, query):
@@ -50,7 +51,7 @@ class APICaller():
 
         Args:
             search_grouping (string): Folder grouping for search results.
-            query (string): Image search query to search for.
+            query (string): Image search query to search fIor.
 
         Returns:
             The constructed output directory.
@@ -155,21 +156,24 @@ class GoogleCaller(APICaller):
             try:
                 image_bytes = requests.get(search_result['link'], timeout=10)
             except Exception as e:
+                image_bytes = None
                 print(f"Unreachable URL: {search_result['link']}\n{str(e)}\n")
 
-            image_path = out_dir + f'/{self.img_size}_{offset+i+1}.png'
+            random_filename = data_utils.generate_random_filename(length=10)
+            image_path = out_dir + f'/{random_filename}.jpg'
 
-            try:
-                self._save_image_file(image_bytes, image_path)
-            except Exception as e:
-                print(f"Unsaveable image: {search_result['link']}\n{str(e)}\n")
+            if image_bytes:
+                try:
+                    self._save_image_file(image_bytes, image_path)
+                except Exception as e:
+                    print(f"Unsaveable image: {search_result['link']}\n{str(e)}\n")
 
 class BingCaller(APICaller):
     """Subclass for calling Google API calls & handling response.
 
     See the following link for the API reference:
     https://docs.microsoft.com/en-us/rest/api/cognitiveservices/bing-images-api-v7-reference
-    """    
+    """
     def __init__(self, api_key, data_root, returns_per_req):
         super().__init__('bing',
                          'https://api.cognitive.microsoft.com/bing/v7.0/images/search',
@@ -211,14 +215,16 @@ class BingCaller(APICaller):
             try:
                 image_bytes = requests.get(search_result['contentUrl'], timeout=10)
             except Exception as e:
+                image_bytes = None
                 print(f"Unreachable URL: {search_result['contentUrl']}\n{str(e)}\n")
 
-            image_path = out_dir + f'/{image_id}.png'
+            image_path = out_dir + f'/{image_id}.jpg'
 
-            try:
-                self._save_image_file(image_bytes, image_path)
-            except Exception as e:
-                print(f"Unsaveable image: {search_result['contentUrl']}\n{str(e)}\n")
+            if image_bytes:
+                try:
+                    self._save_image_file(image_bytes, image_path)
+                except Exception as e:
+                    print(f"Unsaveable image: {search_result['contentUrl']}\n{str(e)}\n")
 
 class FlickrCaller(APICaller):
     """Subclass for calling Flickr API calls & handling response.
@@ -267,14 +273,16 @@ class FlickrCaller(APICaller):
                     try:
                         image_bytes = image_bytes = requests.get(highest_res_url, timeout=10)
                     except Exception as e:
+                        image_bytes = None
                         print(f"Unreachable URL: {highest_res_url}\n{str(e)}\n")
 
-                    image_path = out_dir + f'/{image_id}.png'
+                    image_path = out_dir + f'/{image_id}.jpg'
 
-                    try:
-                        self._save_image_file(image_bytes, image_path)
-                    except Exception as e:
-                        print(f"Unsaveable image: {image_bytes}\n{str(e)}\n")
+                    if image_bytes:
+                        try:
+                            self._save_image_file(image_bytes, image_path)
+                        except Exception as e:
+                            print(f"Unsaveable image: {image_bytes}\n{str(e)}\n")
                                 
                 time.sleep(0.2) # Restricting API call frequency to be a good citizen
             else:
