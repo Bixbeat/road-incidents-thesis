@@ -1,5 +1,5 @@
 import os
-from os import path
+from os import path, walk
 from shutil import copyfile
 import random
 import string
@@ -29,7 +29,7 @@ def create_split_folder(target_dir, split, overwrite=False):
 
 def get_all_img_paths(data_root):
     image_paths = []
-    for root, _, files in os.walk(data_root):
+    for root, _, files in walk(data_root):
         for img in files:
             image_paths.append(path.join(root,img))
     return(image_paths)
@@ -51,17 +51,6 @@ def relocate_images(images_per_split, target_dir, class_label):
     for i,_ in enumerate(images_per_split):
         for image_source_path in images_per_split[i]:
             img_type = '.'+path.basename(image_source_path).split('.')[-1]
-            file_name_out = generate_random_filename() + img_type
+            file_name_out = data_utils.generate_random_filename(length=10) + img_type
             image_target_path = path.join(target_dir, splits[i], class_label, file_name_out)
             copyfile(image_source_path, image_target_path)
-        
-def generate_random_filename():
-    # https://www.pythoncentral.io/python-snippets-how-to-generate-random-string/
-    allchar = string.ascii_letters + string.digits
-    return("".join(random.choice(allchar) for x in range(20)))
-
-if __name__ == '__main__':
-    data_root = '/media/alex/A4A034E0A034BB1E/incidents-thesis/data/collapse'
-    data_target = '/home/alex/Documents/topkek'
-    distribute_annotated_images(data_root, data_target, class_label="collapse")
-    

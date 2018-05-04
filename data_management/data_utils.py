@@ -1,3 +1,5 @@
+import string
+import random
 
 import os
 from PIL import Image
@@ -33,4 +35,9 @@ def del_image_if_equal(img_path_1, img_path_2):
         os.remove(img_path_2)
         remove_path = True
     
-    return remove_path        
+    return remove_path
+
+def generate_random_filename(length=10):
+    # https://www.pythoncentral.io/python-snippets-how-to-generate-random-string/
+    allchar = string.ascii_letters + string.digits
+    return("".join(random.choice(allchar) for x in range(length)))
