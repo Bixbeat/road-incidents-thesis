@@ -4,7 +4,8 @@ from PIL.ExifTags import TAGS, GPSTAGS
 def get_exif(image):
     img = Image.open(image)
     exif = img._getexif()
-    return exif
+    decoded_exif = decode_tags(exif)
+    return decoded_exif
 
 def decode_tags(exif):
     tagged_exif = {}
@@ -25,4 +26,3 @@ def decode_geo(exif_dict):
             exif_dict['GPSInfo'] = gps_data
             
     return exif_dict
-    
