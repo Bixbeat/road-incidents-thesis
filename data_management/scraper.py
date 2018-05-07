@@ -43,8 +43,15 @@ class APICaller():
         with io.BytesIO(image_bytes.content) as f:
             f.seek(0)
             with Image.open(f) as img:
-                img = img.convert("RGB")
-                img.save(path)
+                if img.format in ['JPEG', 'TIFF']:
+                    exif = img._getexif()
+                    if exif and exif != {}:
+                        img.save(path, 'JPEG', exif=img.info['exif'])
+                    else:
+                        img.save(path, 'JPEG')
+                else:
+                    img = img.convert('RGB')
+                    img.save(path, 'JPEG')
 
     def _construct_output_dir(self, search_grouping, query):
         """Creates a directory path for a search.
