@@ -72,23 +72,20 @@ def sync_img_and_lbls(root_dir, src_data_root, img_path, lbl_path):
         file = os.path.basename(file_path)
         missing_img = root_dir + src_data_root + "tiles/" + file
         copyfile(missing_img, root_dir + img_path + '/' + file)
-    
-if __name__ == "__main__":
-    # Get normalize parameters
-    imgs = get_images("/home/anteagroup/Documents/deeplearning/code/bag_project_p2/data/images/train/")
-    # normalize_params = get_normalize_params(imgs, 3)
-    
-    img_directory = "/home/anteagroup/Documents/deeplearning/code/bag_project_p2/data/"
-    # imgdata = ImageDataset(split = "train", root_path = img_directory, joint_trans = ["hflip, vflip"])
-    
-    # example_inputs, example_targets = next(iter(imgdata))
-    
-    
-    # Fixing outputs
-    root_dir = "/home/anteagroup/Documents/deeplearning/code/bag_project_p2/data/"
-    os.chdir("/home/anteagroup/Documents/deeplearning/code/bag_project_p2/data/")
-    data_source_path = "rasters/out/"
-    img_path = "images/train/"
-    lbl_path = "labels/train/"
-    
-    sync_img_and_lbls(root_dir, data_source_path, img_path, lbl_path)
+
+def replace_imgs_with_thumbnails(root_dir, width=400):
+    for folder, _, imgs in os.walk(root_dir):
+        for image_path in imgs:
+            if not '.pickle' in image_path:
+                # Credit: https://stackoverflow.com/questions/273946/how-do-i-resize-an-image-using-pil-and-maintain-its-aspect-ratio
+                full_img_path = os.path.join(folder, image_path)
+                
+                try:
+                    img = Image.open(full_img_path)
+                except Exception as e:
+                    print(Exception)
+
+                wpercent = (width/float(img.size[0]))
+                hsize = int((float(img.size[1])*float(wpercent)))
+                img = img.resize((width,hsize), Image.ANTIALIAS)
+                img.save(os.path.join(folder, image_path))
