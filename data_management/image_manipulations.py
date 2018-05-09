@@ -76,7 +76,7 @@ def sync_img_and_lbls(root_dir, src_data_root, img_path, lbl_path):
 def replace_imgs_with_thumbnails(root_dir, width=400):
     for folder, _, imgs in os.walk(root_dir):
         for image_path in imgs:
-            if not '.pickle' in image_path:
+            if is_image(image_path):
                 # Credit: https://stackoverflow.com/questions/273946/how-do-i-resize-an-image-using-pil-and-maintain-its-aspect-ratio
                 full_img_path = os.path.join(folder, image_path)
                 
@@ -95,12 +95,17 @@ def delete_equal_images(root_dir):
         for image1 in files:
             img_path_1 = os.path.join(root, image1)
             for image2 in files:
-                img_path_2 = os.path.join(root, image2)
+                if is_image(image1) and is_image(image2):
+                    img_path_2 = os.path.join(root, image2)
+                    
+                    remove_path_from_list = del_image_if_equal(img_path_1, img_path_2)
                 
-                remove_path_from_list = del_image_if_equal(img_path_1, img_path_2)
-                
-                if remove_path_from_list == True:
-                    files.remove(image2)
+                    if remove_path_from_list == True:
+                        files.remove(image2)
+
+def is_image(file_path):
+    _, file_extension = os.path.splitext(file_path)
+    return (file_extension.lower() in ['.png','.jpg','.jpeg','.tif','.tiff','.gif'])
 
 def del_image_if_equal(img_path_1, img_path_2):
     img_1 = Image.open(img_path_1)
