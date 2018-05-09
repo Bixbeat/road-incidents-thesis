@@ -2,7 +2,6 @@ import string
 import random
 
 import os
-from PIL import Image
 
 def create_dir_if_not_exist(directory):
     """Creates a directory if the path does not yet exist.

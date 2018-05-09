@@ -1,17 +1,19 @@
 from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
 
-def get_exif(image):
+def get_exif_if_exists(image):
     img = Image.open(image)
-    exif = img._getexif()
-    decoded_exif = decode_tags(exif)
-    return decoded_exif
+    if img.format in ['JPEG', 'TIFF']:
+        exif = img._getexif()
+        decoded_exif = decode_tags(exif)
+        return decoded_exif
 
 def decode_tags(exif):
     tagged_exif = {}
-    for tag, value in exif.items():
-        decoded_tag = TAGS.get(tag, tag)
-        tagged_exif[decoded_tag] = value
+    if exif:
+        for tag, value in exif.items():
+            decoded_tag = TAGS.get(tag, tag)
+            tagged_exif[decoded_tag] = value
     return tagged_exif
 
 def decode_geo(exif_dict):
@@ -24,5 +26,4 @@ def decode_geo(exif_dict):
                 sub_decoded = GPSTAGS.get(tag, tag)
                 gps_data[sub_decoded] = exif_dict['GPSInfo'][tag]
             exif_dict['GPSInfo'] = gps_data
-            
     return exif_dict

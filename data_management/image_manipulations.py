@@ -91,6 +91,7 @@ def replace_imgs_with_thumbnails(root_dir, width=400):
                 img.save(os.path.join(folder, image_path))
 
 def delete_equal_images(root_dir):
+    total_deleted = 0
     for root, _, files in os.walk(root_dir):
         for image1 in files:
             img_path_1 = os.path.join(root, image1)
@@ -102,6 +103,8 @@ def delete_equal_images(root_dir):
                 
                     if remove_path_from_list == True:
                         files.remove(image2)
+                        total_deleted +=1
+    print(f'total images deleted: {total_deleted}')
 
 def is_image(file_path):
     _, file_extension = os.path.splitext(file_path)
