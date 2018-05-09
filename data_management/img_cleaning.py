@@ -7,48 +7,75 @@ from scipy import misc
 import sqlite3
 
 from data_management import exif_functions
+from data_management import image_manipulations as i_manips
 
 class ImgDatabaseHandler():
     def __init__(self, db_root):
-        self.db_root = None
         self.db = sqlite3.connect(db_root)
         self.cursor = self.db.cursor()        
 
-    def _create_img_table(self, img_class):
+    def create_img_table(self, img_class):
         try:
-            self.db.cursor.execute(f'''CREATE TABLE IF NOT EXISTS
+            self.cursor.execute(f'''CREATE TABLE IF NOT EXISTS
                                     {img_class}(img_id VARCHAR PRIMARY KEY, lat REAL, long REAL, datetime VARCHAR)''')
-            self.db.cursor.commit()
+            self.db.commit()
         except Exception as e:
             self.db.rollback()
             raise e
 
     def store_image_details(self, image_class, img_path, location, time):
         try:
-            self.db.execute(f'INSERT INTO ? VALUES (?,?,?,?)', image_class, img_path, location[0], location[1], time)
+            self.db.execute(f'INSERT INTO {image_class} VALUES (?,?,?,?)', [img_path, location[0], location[1], time])
+            self.db.commit()
         except sqlite3.IntegrityError:
             print('Record already exists')
+    
+    def remove_record(self, image_class, img_path):
+        try:
+            self.db.execute(f'DELETE FROM {image_class} WHERE img_id = (?)', [img_path])
+            self.db.commit()
+        except sqlite3.IntegrityError:
+            print('Cannot delete record')        
 
 class ImageCleaner():
     def __init__(self, db_root):
         self.db_handler = ImgDatabaseHandler(db_root)
+        self.previous_img_path = None
+        
+    def skip_to_folder(self, all_folders, folder_name):
+        index = all_folders.index(folder_name)
+        folders_after_split = all_folders[index:]
+        return(folders_after_split)
+            
 
-    def clean_images(self, data_root, target_class):
-        print(f'Determine whether image is of class {target_class} - 1 or empty is true, 0 is false, q for quit')
+    def clean_images(self, data_root, target_class, skip_to_folder_name=None):
+        self.db_handler.create_img_table(target_class)
+        if skip_to_folder_name is not None:
+            all_folders = [x[0] for x in walk(data_root)]
+            folders_after_index = self.skip_to_folder(all_folders, skip_to_folder_name)
+        print(f'''Determine whether image is of class {target_class}: 
+                1 or empty is true, 0 is false, q to quit, sp to save previous, rp to remove previous''')
         for root, _, files in walk(data_root):
+            if skip_to_folder_name:
+                if not root in folders_after_index:
+                    continue
+            print(f"Now in folder {root}")
             for img in files:
                 img_path = path.join(root,img)
-                image = misc.imread(img_path) # Scikit because plotting PIL images doesn't work with Spyder QTConsole
-                plt.imshow(image, aspect='auto')
-                plt.show(block=False) # To force image render while user input is also in the pipeline
-                
-                response = str(input(f'Is this image representative of class {target_class}?: '))
-                self._handle_response(response, target_class, img_path)
 
+                if i_manips.is_image(img_path):
+                    image = misc.imread(img_path) # Scikit because plotting PIL images doesn't work with Spyder QTConsole
+                    plt.imshow(image, aspect='auto')
+                    plt.show(block=False) # To force image render while user input is also in the pipeline
+                    print(img_path)
+                    response = str(input(f'Is this image representative of class {target_class}?: '))
+                    self._handle_response(response, target_class, img_path)
+                    self.previous_img_path = img_path
+    
     def _handle_response(self, response, img_class, img_path):
         time = -9999
         geo = ['','']
-        if response in ['', '1', '0', 'q']:
+        if response in ['', '1', '0', 'rp','sp','q']:
             if response in ['', '1']:
                 img_exif = exif_functions.get_exif_if_exists(img_path)
                 if img_exif:
@@ -60,9 +87,12 @@ class ImageCleaner():
                         # To implement later
 
                 self.db_handler.store_image_details(img_class, img_path, geo, time)
+            elif response == 'sp':
+                self.db_handler.store_image_details(img_class, self.previous_img_path, geo, time)
+            elif response == 'rp':
+                self.db_handler.remove_record(img_class, self.previous_img_path)
             elif response == '0':
-                pass
-
+                pass                
             elif response == 'q':
                 sys.exit()
         else:
