@@ -13,7 +13,10 @@ from data_management import image_manipulations as i_manips
 class ImgDatabaseHandler():
     def __init__(self, db_root):
         self.db = sqlite3.connect(db_root)
-        self.cursor = self.db.cursor()        
+        self.cursor = self.db.cursor()
+        self.previous_img_path = None
+        self.previous_geo = None
+        self.previous_time = None
 
     def create_img_table(self, img_class):
         try:
@@ -71,13 +74,13 @@ class ImageCleaner():
                 img = files[self.current_index]
                 img_path = path.join(root,img)
                 if i_manips.is_image(img_path):
+                    plt.figure(figsize = (8,8))
                     image = misc.imread(img_path) # Scikit because plotting PIL images doesn't work with Spyder QTConsole
                     plt.imshow(image, aspect='auto')
                     plt.show(block=False) # To force image render while user input is also in the pipeline
                     print(f'Index {self.current_index}: {img_path}')
                     response = str(input(f'Is this image representative of class {target_class}?: ')).lower()
                     self._handle_response(response, target_class, img_path)
-                    self.previous_img_path = img_path
                 self.current_index += 1
             self.current_index = 0
     
@@ -96,7 +99,7 @@ class ImageCleaner():
 
             self.db_handler.store_image_details(img_class, img_path, geo, time)
         elif response == 'sp':
-            self.db_handler.store_image_details(img_class, self.previous_img_path, geo, time)
+            self.db_handler.store_image_details(img_class, self.previous_img_path, self.previous_geo, self.previous_time)
             response = str(input(f'Is this image representative of class {img_class}?: '))
             self._handle_response(response, img_class, img_path)
         elif response == 'rp':
@@ -114,6 +117,10 @@ class ImageCleaner():
                 1 or empty for true, 0 for false, q to quit, sp to save previous, rp to remove previous''')            
             response = str(input(f'Is this image representative of class {img_class}?: '))
             self._handle_response(response, img_class, img_path)
+            
+        self.previous_img_path = img_path            
+        self.previous_geo = geo
+        self.previous_time = time
             
     def _set_index(self):
         index = None
