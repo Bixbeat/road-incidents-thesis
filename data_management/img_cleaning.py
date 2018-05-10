@@ -5,6 +5,7 @@ import sys
 import matplotlib.pyplot as plt
 from scipy import misc
 import sqlite3
+import time
 
 from data_management import exif_functions
 from data_management import image_manipulations as i_manips
@@ -41,6 +42,7 @@ class ImageCleaner():
     def __init__(self, db_root):
         self.db_handler = ImgDatabaseHandler(db_root)
         self.previous_img_path = None
+        self.current_index = 0
         
     def skip_to_folder(self, all_folders, folder_name):
         index = all_folders.index(folder_name)
@@ -54,47 +56,71 @@ class ImageCleaner():
             all_folders = [x[0] for x in walk(data_root)]
             folders_after_index = self.skip_to_folder(all_folders, skip_to_folder_name)
         print(f'''Determine whether image is of class {target_class}: 
-                1 or empty is true, 0 is false, q to quit, sp to save previous, rp to remove previous''')
+                1 or empty is true, 0 is false, q to quit, sp to save previous, rp to remove previous, index to skip to an index''')
         for root, _, files in walk(data_root):
             if skip_to_folder_name:
                 if not root in folders_after_index:
                     continue
-            print(f"Now in folder {root}")
-            for img in files:
+            print(f"\n\n\n\n\nNow in folder {root}\n\n\n\n\n")
+            time.sleep(3) # Too easy to miss otherwise
+            while self.current_index < len(files):
+                if self.current_index < 0 or self.current_index > len(files):
+                    self._set_index()
+                    self.current_index += 1
+                    continue
+                img = files[self.current_index]
                 img_path = path.join(root,img)
-
                 if i_manips.is_image(img_path):
                     image = misc.imread(img_path) # Scikit because plotting PIL images doesn't work with Spyder QTConsole
                     plt.imshow(image, aspect='auto')
                     plt.show(block=False) # To force image render while user input is also in the pipeline
-                    print(img_path)
-                    response = str(input(f'Is this image representative of class {target_class}?: '))
+                    print(f'Index {self.current_index}: {img_path}')
+                    response = str(input(f'Is this image representative of class {target_class}?: ')).lower()
                     self._handle_response(response, target_class, img_path)
                     self.previous_img_path = img_path
+                self.current_index += 1
+            self.current_index = 0
     
     def _handle_response(self, response, img_class, img_path):
         time = -9999
         geo = ['','']
-        if response in ['', '1', '0', 'rp','sp','q']:
-            if response in ['', '1']:
-                img_exif = exif_functions.get_exif_if_exists(img_path)
-                if img_exif:
-                    exif_with_geo = exif_functions.decode_geo(img_exif)
-                    if 'DateTimeOriginal' in img_exif.keys():
-                        time = img_exif['DateTimeOriginal']
-                    if 'GPSInfo' in img_exif.keys():
-                        geo = ['yes', 'yes']
-                        # To implement later
+        if response in ['', '1']:
+            img_exif = exif_functions.get_exif_if_exists(img_path)
+            if img_exif:
+                exif_with_geo = exif_functions.decode_geo(img_exif)
+                if 'DateTimeOriginal' in img_exif.keys():
+                    time = img_exif['DateTimeOriginal']
+                if 'GPSInfo' in img_exif.keys():
+                    geo = ['yes', 'yes']
+                    # To implement later
 
-                self.db_handler.store_image_details(img_class, img_path, geo, time)
-            elif response == 'sp':
-                self.db_handler.store_image_details(img_class, self.previous_img_path, geo, time)
-            elif response == 'rp':
-                self.db_handler.remove_record(img_class, self.previous_img_path)
-            elif response == '0':
-                pass                
-            elif response == 'q':
-                sys.exit()
-        else:
+            self.db_handler.store_image_details(img_class, img_path, geo, time)
+        elif response == 'sp':
+            self.db_handler.store_image_details(img_class, self.previous_img_path, geo, time)
             response = str(input(f'Is this image representative of class {img_class}?: '))
             self._handle_response(response, img_class, img_path)
+        elif response == 'rp':
+            self.db_handler.remove_record(img_class, self.previous_img_path)
+            response = str(input(f'Is this image representative of class {img_class}?: '))
+            self._handle_response(response, img_class, img_path)
+        elif response == '0':
+            pass             
+        elif response == 'index':
+            self._set_index()
+        elif response == 'q':
+            sys.exit()
+        else:
+            print(f'''Determine whether image is of class {img_class}: 
+                1 or empty for true, 0 for false, q to quit, sp to save previous, rp to remove previous''')            
+            response = str(input(f'Is this image representative of class {img_class}?: '))
+            self._handle_response(response, img_class, img_path)
+            
+    def _set_index(self):
+        index = None
+        while not type(index) == int:
+            try:
+                index = int(input(f'Type an index to skip to: '))
+            except ValueError:
+                print("Not an integer")
+        self.current_index = index-1 #-1 to offset iteration increment        
+            
