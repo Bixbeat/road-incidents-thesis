@@ -110,18 +110,22 @@ def delete_equal_images_from_root(root_dir):
     If equivalent, it removes the equivalent image."""
     # Welcome to control structure hell
     total_deleted = 0
+    remaining_subdirs = [x[0] for x in os.walk(root_dir)]
     for img1_root, _, img1_files in os.walk(root_dir):
         for image1 in img1_files:
-            for img2_root, _, img2_files in os.walk(root_dir):
-                for image2 in img2_files:
-                    if is_image(image1) and is_image(image2):
-                        img_path_2 = os.path.join(img2_root, image2)
-                        img_path_1 = os.path.join(img1_root, image1)
-                        remove_path_from_list = del_image_if_equal(img_path_1, img_path_2)
-                        if remove_path_from_list == True:
-                            if image2 in img1_files:                                
-                                img1_files.remove(image2)
-                            total_deleted +=1 
+            if len(remaining_subdirs) >= 1:
+                for folder in remaining_subdirs:
+                    for img2_root, _, img2_files in os.walk(folder):
+                        for image2 in img2_files:
+                            if is_image(image1) and is_image(image2):
+                                img_path_2 = os.path.join(img2_root, image2)
+                                img_path_1 = os.path.join(img1_root, image1)
+                                remove_path_from_list = del_image_if_equal(img_path_1, img_path_2)
+                                if remove_path_from_list == True:
+                                    if image2 in img1_files:                                
+                                        img1_files.remove(image2)
+                                    total_deleted +=1
+        remaining_subdirs.remove(img1_root)
     print(f'total images deleted: {total_deleted}')                            
 
 def is_image(file_path):
@@ -134,8 +138,11 @@ def del_image_if_equal(img_path_1, img_path_2):
     remove_path = False
 
     if img_1 == img_2 and img_path_1 != img_path_2:
-        print(f'{img_path_1} is equal to {img_path_2}')
+        print(f'{img_path_1} is equal to {img_path_2} \n')
         os.remove(img_path_2)
         remove_path = True
+        
+    img_1.close()
+    img_2.close()
     
     return remove_path
