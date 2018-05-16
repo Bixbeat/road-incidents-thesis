@@ -90,21 +90,39 @@ def replace_imgs_with_thumbnails(root_dir, width=400):
                 img = img.resize((width,hsize), Image.ANTIALIAS)
                 img.save(os.path.join(folder, image_path))
 
-def delete_equal_images(root_dir):
+def delete_equal_images_in_same_folder(root_dir):
     total_deleted = 0
     for root, _, files in os.walk(root_dir):
         for image1 in files:
             img_path_1 = os.path.join(root, image1)
             for image2 in files:
                 if is_image(image1) and is_image(image2):
-                    img_path_2 = os.path.join(root, image2)
-                    
+                    img_path_2 = os.path.join(root, image2)                    
                     remove_path_from_list = del_image_if_equal(img_path_1, img_path_2)
-                
                     if remove_path_from_list == True:
                         files.remove(image2)
                         total_deleted +=1
     print(f'total images deleted: {total_deleted}')
+    
+def delete_equal_images_from_root(root_dir):
+    """For every image, checks every other image
+    in that root directory for equivalence.
+    If equivalent, it removes the equivalent image."""
+    # Welcome to control structure hell
+    total_deleted = 0
+    for img1_root, _, img1_files in os.walk(root_dir):
+        for image1 in img1_files:
+            for img2_root, _, img2_files in os.walk(root_dir):
+                for image2 in img2_files:
+                    if is_image(image1) and is_image(image2):
+                        img_path_2 = os.path.join(img2_root, image2)
+                        img_path_1 = os.path.join(img1_root, image1)
+                        remove_path_from_list = del_image_if_equal(img_path_1, img_path_2)
+                        if remove_path_from_list == True:
+                            if image2 in img1_files:                                
+                                img1_files.remove(image2)
+                            total_deleted +=1 
+    print(f'total images deleted: {total_deleted}')                            
 
 def is_image(file_path):
     _, file_extension = os.path.splitext(file_path)
