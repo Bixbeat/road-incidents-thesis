@@ -39,7 +39,13 @@ class ImgDatabaseHandler():
             self.db.execute(f'DELETE FROM {image_class} WHERE img_id = (?)', [img_path])
             self.db.commit()
         except sqlite3.IntegrityError:
-            print('Cannot delete record')        
+            print('Cannot delete record')
+    
+    def get_all_records(self, table):
+        try:
+            return([record for record in self.cursor.execute(f'SELECT * FROM {table}')])
+        except sqlite3.IntegrityError:
+            print('Cannot load records')        
 
 class ImageCleaner():
     def __init__(self, db_root):
