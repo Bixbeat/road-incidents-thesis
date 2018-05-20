@@ -31,20 +31,18 @@ if __name__ == "__main__":
 
     init_l_rate = 1e-5
     l_rate_decay = 0.1
-    l_rate_decay_epoch = [25, 80, 200]
+    l_rate_decay_epoch = False # [25, 80, 200]
     w_decay = 1e-4
     
     batch_size = 1
     num_channels = 3
-    num_classes = 2
-
-    shutdown = False
+    num_classes = 3
     
-    model = models.resnet18(pretrained=True)
-    num_ftrs = model.fc.in_features
-    model.fc = nn.Linear(num_ftrs, 2)
     optimizer = optim.SGD
     criterion = nn.CrossEntropyLoss()
+    
+    shutdown_after = False
+    report_results_per_n_batches = {'train':20, 'val':5}
 
 # =============================================================================
 #   DATA LOADING
@@ -59,7 +57,7 @@ if __name__ == "__main__":
                         transforms.RandomResizedCrop(224),
                         transforms.RandomHorizontalFlip(),
                         transforms.ToTensor(),
-                        transforms.Normalize([means[0], means[1], means[2]], [sdevs[0], sdevs[1], sdevs[2]])
+                        transforms.Normalize(means, sdevs)
                     ])
 
     val_transforms =  transforms.Compose([
@@ -81,8 +79,12 @@ if __name__ == "__main__":
 # =============================================================================
 #   LOAD MODEL
 # =============================================================================
+    model = models.resnet18(pretrained=True)
+    num_ftrs = model.fc.in_features
+    model.fc = nn.Linear(num_ftrs, num_classes)    
+    
     analysis = runtime_logic.AnnotatedImageAnalysis(model, means, sdevs, train_loader, val_loader)
-    analysis.setup_output_storage('/home/alex/Documents/Scripts/road-incidents-thesis/outputs')
+    analysis.loss_tracker.setup_output_storage(run_name, 'outputs/')
     
 # =============================================================================
 #   INITIALIZE TRAINER    
@@ -106,18 +108,17 @@ if __name__ == "__main__":
                         help='Learning Rate')
     parser.add_argument('--l_rate_decay', nargs='?', type=float, default=l_rate_decay, 
                         help='Amount of learning rate decay')
-    parser.add_argument('--l_rate_decay_epoch', nargs='?', type=int, default=l_rate_decay_epoch,
-                        help='Epoch at which decay should occur')    
     parser.add_argument('--w_decay', nargs='?', type=float, default=w_decay,
                         help='Weight decay')
+    parser.add_argument('--l_rate_decay_epoch', nargs='?', type=int, default=l_rate_decay_epoch,
+                        help='Epoch at which decay should occur')
     
     ##Saving & information
-    parser.add_argument('--report_interval', nargs='?', type=float, default=50,
+    parser.add_argument('--report_interval', nargs='?', type=float, default=report_results_per_n_batches,
                         help='Epochs between loss function printouts')
     parser.add_argument('--save_interval', nargs='?', type=float, default=25,
                         help='Epochs between model checkpoint saves')    
-    parser.add_argument('--shutdown', nargs='?', type=bool, default=shutdown,
-                        help='Shutdown after training')    
+    parser.add_argument('--shutdown', nargs='?', type=bool, default=shutdown_after,
+                        help='Shutdown after training')
     args = parser.parse_args()
-
     analysis.train(args)
