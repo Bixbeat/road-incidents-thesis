@@ -142,11 +142,11 @@ class Visualiser(object):
         <br>
         {ep_t}
         <br>
-        <b>Epoch samples per second</b>:
+        <b>Epoch batches per second</b>:
         <br>
         {ep_spd}
         <br>
-        <b>Avg samples per second</b>:
+        <b>Avg batches per second</b>:
         <br>
         {avg_spd}
         <br>

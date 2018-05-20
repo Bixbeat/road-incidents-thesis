@@ -10,14 +10,13 @@ import scipy.misc as misc
 import torch
 import torch.nn as nn
 from torch.optim import SGD, Adam, RMSprop
-from torch.autograd import Variable
 from torchvision.transforms import Compose, Normalize
 from torchvision.transforms import ToTensor
 
 from data_management import data_utils
 
 class ImageAnalysis(object):
-    def __init__(self, model, train_loader=None, val_loader=None, means=[], sdevs=[]):
+    def __init__(self, model, train_loader=None, val_loader=None, means=None, sdevs=None):
         ## Model components
         self.model = model
         self.train_loader = train_loader
@@ -29,18 +28,6 @@ class ImageAnalysis(object):
         
         ## Timing
         self.start_time = dt.datetime.now()
-
-        ## Tracking loss
-        self.train_loss_file = None
-        self.val_loss_file = None
-
-        self.all_train_loss = np.array([])
-        self.all_val_loss = np.array([])     
-
-        self.root_dir = None
-        self.shutdown_after = False
-        self.store_loss = False
-        self.store_models = False
 
     def initialize_visualisation(self):
         self.vis_data = visualise.Visualiser()
@@ -54,25 +41,8 @@ class ImageAnalysis(object):
             self.val_timebox = self.vis_data.vis_create_timetracker(self.start_time)
             self.combined_loss_window = self.vis_data.vis_plot_loss("combined")
     
-    def imgs_labels_to_variables(self, images, labels):
-        if torch.cuda.is_available():
-            images = Variable(images.cuda())
-            labels = Variable(labels.cuda())
-        else:
-            images = Variable(images)
-            labels = Variable(labels)
-        return images, labels    
-
-    def create_loss_file(self, split, run_name):
-        data_utils.create_dir_if_not_exist(f'{self.root_dir}/loss/{run_name}')
-        return(f'{self.root_dir}/loss/{run_name}/{split}.csv')
-
-    def update_loss_values(self, all_recorded_loss, avg_epoch_loss, loss_plot_window):
+    def update_loss_values(self, all_recorded_loss, loss_plot_window):
         self.vis_data.custom_update_loss_plot(loss_plot_window, all_recorded_loss, title="<b>Training loss</b>", color='#0000ff')
-        
-    def save_loss_if_enabled(self, loss_file, run_name, avg_epoch_train_loss, epoch):
-        if self.store_loss is not None:
-            analysis_utils.write_loss(file=loss_file, run_name=run_name, loss=avg_epoch_train_loss, epoch=epoch)
 
     def update_vis_timer(self,header,epoch_start,total_n_samples,timebox):
         epoch_end = dt.datetime.now()
@@ -80,22 +50,11 @@ class ImageAnalysis(object):
         epoch_spd = epoch_time/(total_n_samples)
         self.vis_data.update_timer(header,timebox,epoch_start,epoch_time,epoch_spd)
 
-    def setup_output_storage(self, root_dir, store_models=True, store_loss=True):
-        self.root_dir = root_dir
-        if store_models == True:
-            self.store_models = True
-            data_utils.create_dir_if_not_exist(path.join(root_dir, 'models'))
-        if store_loss == True:
-            self.store_loss = True
-            data_utils.create_dir_if_not_exist(path.join(root_dir, 'loss'))
-
-
 class AnnotatedImageAnalysis(ImageAnalysis):
     """Performs semantic segmentation
     TODO: refactor repeated code (e.g. timekeeping)"""
     def __init__(self, model, means, sdevs, train_loader=None, val_loader=None):    
         super().__init__(model, train_loader, val_loader, means, sdevs)
-        
         self.model = model
         self.train_loader = train_loader
         self.val_loader = val_loader
@@ -109,6 +68,19 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         self.all_train_loss = np.array([])
         self.all_val_loss = np.array([])          
         
+        self.loss_tracker = analysis_utils.LossRecorder()
+
+    def get_batch_loss(self, batch, model, criterion, optimizer=None):
+        if optimizer:
+            optimizer.zero_grad()
+        images, labels = analysis_utils.imgs_labels_to_variables(batch[0], batch[1])
+        outputs = model(images)
+        loss = criterion(outputs, labels)
+        if optimizer:
+            loss.backward()
+            optimizer.step()
+        return(loss.data[0])
+
     def train(self, args):
         """Performs model training
         Args:
@@ -124,9 +96,8 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         self.initialize_visualisation()
         
         # Setup loss
-        if self.store_loss is True:
-            data_utils.create_dir_if_not_exist(f'{self.root_dir}/loss/{args.run_name}')
-            self.train_loss_file = self.create_loss_file('train', args.run_name)
+        if self.loss_tracker.store_loss is True:
+            self.loss_tracker.set_loss_file('train')
 
         if torch.cuda.is_available():
             self.model = torch.nn.DataParallel(self.model, device_ids=range(torch.cuda.device_count()))
@@ -142,11 +113,14 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             model = self.model.train()
             train_epoch_start = dt.datetime.now()
 
-            # Decay learning rate
-            optimizer = analysis_utils.exp_lr_scheduler(optimizer, epoch, args.l_rate_decay, args.l_rate_decay_epoch)
+            # Use either scheduled decay or decay at plateau
+            if args.l_rate_decay_epoch:
+                analysis_utils.exp_lr_scheduler(optimizer, epoch, args.l_rate_decay, args.l_rate_decay_epoch)
+            elif self.loss_tracker.is_loss_at_plateau(epochs_until_decay=8) is True:
+                analysis_utils.decay_learning_rate(optimizer, args.lr_decay)
 
             for i, batch in enumerate(self.train_loader):
-                images, labels = self.imgs_labels_to_variables(batch[0], batch[1])
+                images, labels = analysis_utils.imgs_labels_to_variables(batch[0], batch[1])
 
                 optimizer.zero_grad()
 
@@ -157,10 +131,10 @@ class AnnotatedImageAnalysis(ImageAnalysis):
 
                 epoch_train_loss += train_loss.data[0]
 
-                if (i+1) % args.report_interval == 0:
+                if (i+1) % args.report_interval['train'] == 0:
                     print(f'Train {epoch+1}: [{i} of {len(self.train_loader)}] : {epoch_train_loss/(i+1):.4f}')
                     break
-                    # CONTINUE HERE
+                    # TODO
                     # img, pred = visualise.encoded_img_and_lbl_to_data(image, pred, self.means, self.sdevs)
                     # visualise.plot_pairs(img, pred)
 
@@ -169,25 +143,25 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             # Store loss
             avg_epoch_train_loss = epoch_train_loss/(i+1)
 
-            self.all_train_loss = np.append(self.all_val_loss, avg_epoch_train_loss)
+            self.loss_tracker.all_loss['train'] = np.append(self.loss_tracker.all_loss['train'], avg_epoch_train_loss)
             self.vis_data.custom_update_loss_plot(self.train_loss_window, self.all_train_loss, title="<b>Train loss</b>", color="#0000ff")
 
-            self.save_loss_if_enabled(self.train_loss_file, args.run_name, avg_epoch_train_loss, epoch_now)
+            self.loss_tracker.save_loss_if_enabled(self.loss_tracker.loss_files['train'], avg_epoch_train_loss, epoch_now)
 
             # Timekeeping
-            total_num_samples = i+1
-            self.update_vis_timer("<b>Training</b>",train_epoch_start, total_num_samples,self.train_timebox)
+            total_train_batches = len(self.train_loader)
+            self.update_vis_timer("<b>Training</b>", train_epoch_start, total_train_batches, self.train_timebox)
 
             # Validate model at every epoch if val loader is present           
-            if self.val_loader != None:
+            if self.val_loader is not None:
                 self.validate(criterion, args)
-                self.vis_data.custom_combined_loss_plot(self.combined_loss_window, self.all_train_loss, self.all_val_loss)
+                self.vis_data.custom_combined_loss_plot(self.combined_loss_window, self.loss_tracker.all_loss['train'], self.loss_tracker.all_loss['val'])
 
-            if epoch_now % args.save_interval == 0 and self.store_models == True:
-                torch.save(self.model.state_dict(), f'outputs/models/{epoch_now}_{args.run_name}.pkl')
+            if epoch_now % args.save_interval == 0 and self.loss_tracker.store_models is True:
+                self.loss_tracker.save_model(model, epoch)
 
         # Shutdown after the final epoch
-        if self.shutdown_after == True:
+        if args.shutdown is True:
             os.system("shutdown")
 
     def validate(self, criterion, args):
@@ -198,19 +172,18 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         epoch_val_loss = 0
         val_epoch_start = dt.datetime.now()
 
-        if self.store_loss is True:
-            data_utils.create_dir_if_not_exist(f'{self.root_dir}/loss/{args.run_name}')
-            self.val_loss_file = self.create_loss_file('val', args.run_name)
+        if self.loss_tracker.store_loss is True:
+            self.loss_tracker.set_loss_file('val')
 
         for i, (images, labels) in enumerate(self.val_loader):
-            images, labels = self.imgs_labels_to_variables(images, labels)
+            images, labels = analysis_utils.imgs_labels_to_variables(images, labels)
 
             outputs = eval_model(images)
             val_loss = criterion(outputs, labels)
 
             epoch_val_loss += val_loss.data[0]
 
-            if (i+1) % args.report_interval == 0:
+            if (i+1) % args.report_interval['val'] == 0:
                 print(f"Val [{i} of {len(self.val_loader)}] : {epoch_val_loss/(i+1):.4f}")
                 break
                 # Plot predictions
@@ -224,21 +197,21 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         # Record validation loss & determine if model is best on val set
         avg_epoch_val_loss = epoch_val_loss/(i+1) 
 
-        if len(self.all_val_loss) > 0 and self.store_models is True:
-            if min(self.all_val_loss) > avg_epoch_val_loss:
-                torch.save(self.model.state_dict(), f'outputs/models/{args.run_name}_best_model.pkl')
+        if len(self.loss_tracker.all_loss['val']) > 0 and self.loss_tracker.store_models is True:
+            if min(self.loss_tracker.all_loss['val']) > avg_epoch_val_loss:
+                self.loss_tracker.save_model(eval_model, 'best')
 
         # Record validation loss & plot results
-        self.all_val_loss = np.append(self.all_val_loss, avg_epoch_val_loss)
-        self.vis_data.custom_update_loss_plot(self.val_loss_window, self.all_val_loss, title="<b>Validation loss</b>")
+        self.loss_tracker.all_loss['val'] = np.append(self.loss_tracker.all_loss['val'], avg_epoch_val_loss)
+        self.vis_data.custom_update_loss_plot(self.val_loss_window, self.loss_tracker.all_loss['val'], title="<b>Validation loss</b>")
 
         # Store loss
-        epoch_now = len(self.all_val_loss)
-        self.save_loss_if_enabled(self.val_loss_file, args.run_name, avg_epoch_val_loss, epoch_now)
+        epoch_now = len(self.loss_tracker.all_loss['val'])
+        self.loss_tracker.save_loss_if_enabled(self.loss_tracker.loss_files['val'], avg_epoch_val_loss, epoch_now)
 
         # Timekeeping
-        total_num_samples = i+1
-        self.update_vis_timer("<b>Validation</b>",val_epoch_start, total_num_samples,self.val_timebox)
+        total_val_batches = len(self.val_loader)
+        self.update_vis_timer("<b>Validation</b>", val_epoch_start, total_val_batches,self.val_timebox)
 
     def analyse(self, img_directory, transforms, output_dir):
         """With a deployed model and input directory, performs model evaluation

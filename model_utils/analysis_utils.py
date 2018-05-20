@@ -1,10 +1,54 @@
 import os
-from numpy import random
 from collections import OrderedDict
 import pickle
+import numpy as np
 
 import torch
 import torch.nn as nn
+from torch.autograd import Variable
+
+from data_management import data_utils
+
+class LossRecorder():
+    def __init__(self, output_dir='outputs/'):
+        self.output_dir = output_dir
+        self.run_name = None
+        
+        self.store_models = False
+        self.store_loss = False
+        self.loss_files = {'train':'', 'val':''}
+        self.all_loss = {'train':np.array([]), 'val':np.array([])}
+        
+    def setup_output_storage(self, run_name, store_models=True, store_loss=True):
+        self.run_name = run_name
+        
+        if store_loss is True:
+            self.store_loss = True
+            data_utils.create_dir_if_not_exist(os.path.join(self.output_dir, 'loss'))        
+        if store_models is True:
+            self.store_models = True
+            data_utils.create_dir_if_not_exist(os.path.join(self.output_dir, 'models'))
+    
+    def set_loss_file(self, split):
+        data_utils.create_dir_if_not_exist(f'{self.output_dir}/loss/{self.run_name}')
+        self.loss_files[split] = f'{self.output_dir}/loss/{self.run_name}/{split}.csv' 
+    
+    def save_loss_if_enabled(self, loss_file, epoch_loss, epoch):
+        if self.store_loss is not None:
+            write_loss(loss_file, self.run_name, epoch_loss, epoch)    
+            
+    def is_loss_at_plateau(self, epochs_until_decay):
+        if len(self.all_loss['train']) >= epochs_until_decay:
+            return(self.all_loss['train'][-1] > np.mean(self.all_loss['train'][-epochs_until_decay:-2]))
+
+    def save_model(self, model, prefix):
+        torch.save(model.state_dict(), f'outputs/models/{prefix}_{self.run_name}.pkl')            
+
+def imgs_labels_to_variables(images, labels):
+    if torch.cuda.is_available():
+        return(Variable(images.cuda()), Variable(labels.cuda()))
+    else:
+        return(Variable(images), Variable(labels))
 
 def set_dropout_probability(model, p=0):
     ## In PyTorch 0.3 .eval() on model doesn't set dropout to zero in specific cases. This is a bandaid solution.
@@ -33,10 +77,12 @@ def write_normalize_values(norm_params, output_file_path):
 def exp_lr_scheduler(optimizer, epoch, lr_decay=0.1, lr_decay_epoch=7):
     """Decay learning rate by a factor of lr_decay every lr_decay_epoch epochs
     https://discuss.pytorch.org/t/adaptive-learning-rate/320/25"""
-    
     if epoch in lr_decay_epoch:
-        return optimizer
-    
+        return(optimizer)
+    else:
+        return(decay_learning_rate(optimizer, lr_decay))
+
+def decay_learning_rate(optimizer, lr_decay):
     for param_group in optimizer.param_groups:
         param_group['lr'] *= lr_decay
     return optimizer
