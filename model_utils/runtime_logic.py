@@ -120,20 +120,12 @@ class AnnotatedImageAnalysis(ImageAnalysis):
                 analysis_utils.decay_learning_rate(optimizer, args.lr_decay)
 
             for i, batch in enumerate(self.train_loader):
-                images, labels = analysis_utils.imgs_labels_to_variables(batch[0], batch[1])
+                batch_loss = self.get_batch_loss(batch, model, criterion, optimizer)
 
-                optimizer.zero_grad()
-
-                outputs = model(images)
-                train_loss = criterion(outputs, labels)
-                train_loss.backward()
-                optimizer.step()
-
-                epoch_train_loss += train_loss.data[0]
+                epoch_train_loss += batch_loss
 
                 if (i+1) % args.report_interval['train'] == 0:
                     print(f'Train {epoch+1}: [{i} of {len(self.train_loader)}] : {epoch_train_loss/(i+1):.4f}')
-                    break
                     # TODO
                     # img, pred = visualise.encoded_img_and_lbl_to_data(image, pred, self.means, self.sdevs)
                     # visualise.plot_pairs(img, pred)
@@ -175,17 +167,12 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         if self.loss_tracker.store_loss is True:
             self.loss_tracker.set_loss_file('val')
 
-        for i, (images, labels) in enumerate(self.val_loader):
-            images, labels = analysis_utils.imgs_labels_to_variables(images, labels)
-
-            outputs = eval_model(images)
-            val_loss = criterion(outputs, labels)
-
-            epoch_val_loss += val_loss.data[0]
+        for i, batch in enumerate(self.val_loader):
+            batch_loss = self.get_batch_loss(batch, eval_model, criterion)
+            epoch_val_loss += batch_loss
 
             if (i+1) % args.report_interval['val'] == 0:
                 print(f"Val [{i} of {len(self.val_loader)}] : {epoch_val_loss/(i+1):.4f}")
-                break
                 # Plot predictions
                 # preds = analysis_utils.get_predictions(outputs)
                 # image = images[0]
