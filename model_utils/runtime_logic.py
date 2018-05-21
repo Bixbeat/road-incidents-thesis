@@ -130,9 +130,6 @@ class AnnotatedImageAnalysis(ImageAnalysis):
 
                 epoch_train_loss += batch_loss
 
-                if settings['visualiser'] == 'tensorboard':
-                    self.writer.add_graph_onnx(model, batch)
-
                 if (i+1) % settings['report_interval']['train'] == 0:
                     print(f'Train {epoch+1}: [{i} of {len(self.train_loader)}] : {epoch_train_loss/(i+1):.4f}')
                     # TODO
@@ -160,6 +157,8 @@ class AnnotatedImageAnalysis(ImageAnalysis):
                 self.update_vis_timer("<b>Training</b>", train_epoch_start, total_train_batches, self.train_timebox)                
                 if self.val_loader is not None:
                     self.vis_data.custom_combined_loss_plot(self.combined_loss_window, self.loss_tracker.all_loss['train'], self.loss_tracker.all_loss['val'])
+            elif settings['visualiser'] == 'tensorboard':
+                self.writer.add_scalar('Train/Loss', avg_epoch_train_loss, epoch_now)
 
         # Shutdown after the final epoch
         if settings['shutdown'] is True:
@@ -181,7 +180,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             epoch_val_loss += batch_loss
 
             if settings['visualiser'] == 'tensorboard':
-                self.writer.add_graph_onnx(eval_model, batch)            
+                self.writer.add_scalar('val/loss', epoch_val_loss, epoch_val_loss)        
 
             if (i+1) % settings['report_interval']['val'] == 0:
                 print(f"Val [{i} of {len(self.val_loader)}] : {epoch_val_loss/(i+1):.4f}")
@@ -193,7 +192,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
                 # img, pred = visualise.encoded_img_and_lbl_to_data(image, pred, self.means, self.sdevs, self.label_colours)
                 # visualise.plot_pairs(img, pred)
 
-        epoch_now = len(self.loss_tracker.all_loss['val'])
+        epoch_now = len(self.loss_tracker.all_loss['val'])+1
         total_val_batches = len(self.val_loader)        
         avg_epoch_val_loss = epoch_val_loss/(i+1) 
 
@@ -207,6 +206,9 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         if settings['visualiser'] == 'visdom':
             self.update_vis_timer("<b>Validation</b>", val_epoch_start, total_val_batches,self.val_timebox)
             self.vis_data.custom_update_loss_plot(self.val_loss_window, self.loss_tracker.all_loss['val'], title="<b>Validation loss</b>")
+        elif settings['visualiser'] == 'tensorboard':
+            self.writer.add_scalar('Val/Loss', avg_epoch_val_loss, epoch_now)
+
 
     def analyse(self, img_directory, transforms, output_dir):
         """With a deployed model and input directory, performs model evaluation
