@@ -12,8 +12,10 @@ import torch.nn as nn
 from torch.optim import SGD, Adam, RMSprop
 from torchvision.transforms import Compose, Normalize
 from torchvision.transforms import ToTensor
+from tensorboardX import SummaryWriter
 
 from data_management import data_utils
+
 
 class ImageAnalysis(object):
     def __init__(self, model, train_loader=None, val_loader=None, means=None, sdevs=None):
@@ -29,8 +31,8 @@ class ImageAnalysis(object):
         ## Timing
         self.start_time = dt.datetime.now()
 
-    def initialize_visualisation(self):
-        self.vis_data = visualise.Visualiser()
+    def initialize_visdom_visualisation(self):
+        self.vis_data = visualise.VisdomVisualiser()
         
         if self.train_loader != None:
             self.train_loss_window = self.vis_data.vis_plot_loss('train')
@@ -40,7 +42,7 @@ class ImageAnalysis(object):
             self.val_loss_window = self.vis_data.vis_plot_loss('val')
             self.val_timebox = self.vis_data.vis_create_timetracker(self.start_time)
             self.combined_loss_window = self.vis_data.vis_plot_loss("combined")
-    
+
     def update_loss_values(self, all_recorded_loss, loss_plot_window):
         self.vis_data.custom_update_loss_plot(loss_plot_window, all_recorded_loss, title="<b>Training loss</b>", color='#0000ff')
 
@@ -69,6 +71,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         self.all_val_loss = np.array([])          
         
         self.loss_tracker = analysis_utils.LossRecorder()
+        self.writer = None
 
     def get_batch_loss(self, batch, model, criterion, optimizer=None):
         if optimizer:
@@ -93,7 +96,10 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         --l_rate_decay_epoch, type=int      'Epoch at which decay should occur'
         --w_decay,            type=float    'Weight decay'
         """
-        self.initialize_visualisation()
+        if settings['visualiser'] == 'visdom':
+            self.initialize_visdom_visualisation()
+        else:
+            self.writer = SummaryWriter()
         
         # Setup loss
         if self.loss_tracker.store_loss is True:
@@ -124,6 +130,9 @@ class AnnotatedImageAnalysis(ImageAnalysis):
 
                 epoch_train_loss += batch_loss
 
+                if settings['visualiser'] == 'tensorboard':
+                    self.writer.add_graph(model, batch)
+
                 if (i+1) % settings['report_interval']['train'] == 0:
                     print(f'Train {epoch+1}: [{i} of {len(self.train_loader)}] : {epoch_train_loss/(i+1):.4f}')
                     # TODO
@@ -131,26 +140,26 @@ class AnnotatedImageAnalysis(ImageAnalysis):
                     # visualise.plot_pairs(img, pred)
 
             epoch_now = epoch+1
+            total_train_batches = len(self.train_loader)
 
             # Store loss
             avg_epoch_train_loss = epoch_train_loss/(i+1)
-
             self.loss_tracker.all_loss['train'] = np.append(self.loss_tracker.all_loss['train'], avg_epoch_train_loss)
-            self.vis_data.custom_update_loss_plot(self.train_loss_window, self.all_train_loss, title="<b>Train loss</b>", color="#0000ff")
-
             self.loss_tracker.save_loss_if_enabled(self.loss_tracker.loss_files['train'], avg_epoch_train_loss, epoch_now)
-
-            # Timekeeping
-            total_train_batches = len(self.train_loader)
-            self.update_vis_timer("<b>Training</b>", train_epoch_start, total_train_batches, self.train_timebox)
 
             # Validate model at every epoch if val loader is present           
             if self.val_loader is not None:
                 self.validate(criterion, settings)
-                self.vis_data.custom_combined_loss_plot(self.combined_loss_window, self.loss_tracker.all_loss['train'], self.loss_tracker.all_loss['val'])
 
             if epoch_now % settings['save_interval'] == 0 and self.loss_tracker.store_models is True:
                 self.loss_tracker.save_model(model, epoch)
+
+            # Visualizing
+            if settings['visualiser'] == 'visdom':
+                self.vis_data.custom_update_loss_plot(self.train_loss_window, self.all_train_loss, title="<b>Train loss</b>", color="#0000ff")
+                self.update_vis_timer("<b>Training</b>", train_epoch_start, total_train_batches, self.train_timebox)                
+                if self.val_loader is not None:
+                    self.vis_data.custom_combined_loss_plot(self.combined_loss_window, self.loss_tracker.all_loss['train'], self.loss_tracker.all_loss['val'])
 
         # Shutdown after the final epoch
         if settings['shutdown'] is True:
@@ -171,6 +180,9 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             batch_loss = self.get_batch_loss(batch, eval_model, criterion)
             epoch_val_loss += batch_loss
 
+            if settings['visualiser'] == 'tensorboard':
+                self.writer.add_graph(eval_model, batch)            
+
             if (i+1) % settings['report_interval']['val'] == 0:
                 print(f"Val [{i} of {len(self.val_loader)}] : {epoch_val_loss/(i+1):.4f}")
                 # Plot predictions
@@ -181,24 +193,20 @@ class AnnotatedImageAnalysis(ImageAnalysis):
                 # img, pred = visualise.encoded_img_and_lbl_to_data(image, pred, self.means, self.sdevs, self.label_colours)
                 # visualise.plot_pairs(img, pred)
 
-        # Record validation loss & determine if model is best on val set
+        epoch_now = len(self.loss_tracker.all_loss['val'])
+        total_val_batches = len(self.val_loader)        
         avg_epoch_val_loss = epoch_val_loss/(i+1) 
 
         if len(self.loss_tracker.all_loss['val']) > 0 and self.loss_tracker.store_models is True:
             if min(self.loss_tracker.all_loss['val']) > avg_epoch_val_loss:
                 self.loss_tracker.save_model(eval_model, 'best')
 
-        # Record validation loss & plot results
         self.loss_tracker.all_loss['val'] = np.append(self.loss_tracker.all_loss['val'], avg_epoch_val_loss)
-        self.vis_data.custom_update_loss_plot(self.val_loss_window, self.loss_tracker.all_loss['val'], title="<b>Validation loss</b>")
-
-        # Store loss
-        epoch_now = len(self.loss_tracker.all_loss['val'])
         self.loss_tracker.save_loss_if_enabled(self.loss_tracker.loss_files['val'], avg_epoch_val_loss, epoch_now)
 
-        # Timekeeping
-        total_val_batches = len(self.val_loader)
-        self.update_vis_timer("<b>Validation</b>", val_epoch_start, total_val_batches,self.val_timebox)
+        if settings['visualiser'] == 'visdom':
+            self.update_vis_timer("<b>Validation</b>", val_epoch_start, total_val_batches,self.val_timebox)
+            self.vis_data.custom_update_loss_plot(self.val_loss_window, self.loss_tracker.all_loss['val'], title="<b>Validation loss</b>")
 
     def analyse(self, img_directory, transforms, output_dir):
         """With a deployed model and input directory, performs model evaluation

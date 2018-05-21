@@ -4,6 +4,7 @@ import numpy as np
 import datetime as dt
 import time as t
 import matplotlib.pyplot as plt
+from tensorboardX import SummaryWriter
 
 def plot_pairs(image, label):
     """Takes an image tensor and its reconstruction vars, and
@@ -58,9 +59,9 @@ def decode_image(tensor, mean, sdev):
     transposed_tensor = tensor.numpy().transpose((1, 2, 0))
     unnormed_img = np.array(sdev) * transposed_tensor + np.array(mean)
     image = np.clip(unnormed_img, 0, 1)
-    return image
+    return image   
 
-class Visualiser(object):
+class VisdomVisualiser():
     def __init__(self):
         self.vis = visdom.Visdom()
         self.start_time = None
@@ -74,8 +75,6 @@ class Visualiser(object):
                                               title=title,
                                               legend=['Loss']))
         return loss_window
-
-    torch.zeros(2, 3)
 
     def vis_create_timetracker(self, current_time):
         self.start_time = current_time
@@ -96,7 +95,7 @@ class Visualiser(object):
                      marker={'color': color, 'size': marker_size}, name='1st Trace')
         layout = dict(title=title, xaxis=dict(title='epoch'), yaxis=dict(title=title, range=[0,1]))
         
-        self.vis._send({'data': [trace], 'layout': layout, 'win': loss_window})        
+        self.vis._send({'data': [trace], 'layout': layout, 'win': loss_window})
 
     def custom_combined_loss_plot(self, loss_window, train_loss, val_loss, size=10, title='<b>Combined loss</b>'):
         """For a given visdom window, creates a plot containing both train & validation traces"""
@@ -109,7 +108,7 @@ class Visualiser(object):
                      marker={'color': '#0047ab', 'size': size})
         
         val_trace = dict(x=x_axis, y=val_y_axis, mode="lines", type='custom', name='Validation loss',
-                     marker={'color': '#ffa500', 'size': size})
+                         marker={'color': '#ffa500', 'size': size})
         
         layout = dict(title=title, xaxis=dict(title='<b>epoch</b>'), yaxis=dict(title='<b>Loss</b>', range=[0,1]))
         

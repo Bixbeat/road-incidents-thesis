@@ -11,7 +11,7 @@ from data_management import image_manipulations as i_manips
 from model_utils import runtime_logic
 
 if __name__ == "__main__":
-    # Fix conda slow loading https://github.com/pytorch/pytorch/issues/537    
+    # Fix conda slow loading https://github.com/pytorch/pytorch/issues/537
 
 # =============================================================================
 #   HYPERPARAMETERS
@@ -40,6 +40,7 @@ if __name__ == "__main__":
     shutdown_after = False
     report_results_per_n_batches = {'train':20, 'val':5}
     save_interval = 9999
+    visualiser = 'tensorboard'
     
     
 # =============================================================================
@@ -106,7 +107,8 @@ if __name__ == "__main__":
                  # Saving & Information retrieval
                  'report_interval':report_results_per_n_batches,
                  'save_interval':save_interval,
-                 'shutdown':shutdown_after
+                 'shutdown':shutdown_after,
+                 'visualiser':visualiser
                 }
 
     analysis.train(arguments)
