@@ -1,17 +1,13 @@
 import argparse
 import os
-import pickle
-import numpy as np
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torchvision import models, datasets, transforms
-from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, Normalize, ToTensor
 
 from data_management import image_manipulations as i_manips
-from model_utils import analysis_utils
 from model_utils import runtime_logic
 
 if __name__ == "__main__":
@@ -43,6 +39,15 @@ if __name__ == "__main__":
     
     shutdown_after = False
     report_results_per_n_batches = {'train':20, 'val':5}
+    save_interval = 9999
+    
+    
+# =============================================================================
+#   LOAD MODEL
+# =============================================================================
+    model = models.resnet18(pretrained=True)
+    num_ftrs = model.fc.in_features
+    model.fc = nn.Linear(num_ftrs, num_classes)    
 
 # =============================================================================
 #   DATA LOADING
@@ -75,50 +80,31 @@ if __name__ == "__main__":
 
     val_loader = torch.utils.data.DataLoader(val_data, batch_size=batch_size,
                                                 shuffle=True, num_workers=workers)                                                
-    
+
 # =============================================================================
-#   LOAD MODEL
+#   INITIALIZE RUNTIME CLASSES
 # =============================================================================
-    model = models.resnet18(pretrained=True)
-    num_ftrs = model.fc.in_features
-    model.fc = nn.Linear(num_ftrs, num_classes)    
-    
     analysis = runtime_logic.AnnotatedImageAnalysis(model, means, sdevs, train_loader, val_loader)
     analysis.loss_tracker.setup_output_storage(run_name, 'outputs/')
-    
+
 # =============================================================================
 #   INITIALIZE TRAINER    
 # =============================================================================
-    parser = argparse.ArgumentParser(description='Hyperparams')
-    
-    ## Model components
-    parser.add_argument('--run_name', nargs='?', type=str, default=run_name,
-                        help='Name used for storage & metadata purposes')            
-    parser.add_argument('--optimizer', nargs='?', type=str, default=optimizer,
-                        help='Name used for storage & metadata purposes')
-    parser.add_argument('--criterion', nargs='?', type=str, default=criterion,
-                        help='Criterion used')
-    
-    ## Hyperparameters
-    parser.add_argument('--n_epoch', nargs='?', type=int, default=n_epochs, 
-                        help='# of the epochs')
-    parser.add_argument('--batch_size', nargs='?', type=int, default=batch_size, 
-                        help='Batch Size')
-    parser.add_argument('--l_rate', nargs='?', type=float, default=init_l_rate, 
-                        help='Learning Rate')
-    parser.add_argument('--l_rate_decay', nargs='?', type=float, default=l_rate_decay, 
-                        help='Amount of learning rate decay')
-    parser.add_argument('--w_decay', nargs='?', type=float, default=w_decay,
-                        help='Weight decay')
-    parser.add_argument('--l_rate_decay_epoch', nargs='?', type=int, default=l_rate_decay_epoch,
-                        help='Epoch at which decay should occur')
-    
-    ##Saving & information
-    parser.add_argument('--report_interval', nargs='?', type=float, default=report_results_per_n_batches,
-                        help='Epochs between loss function printouts')
-    parser.add_argument('--save_interval', nargs='?', type=float, default=25,
-                        help='Epochs between model checkpoint saves')    
-    parser.add_argument('--shutdown', nargs='?', type=bool, default=shutdown_after,
-                        help='Shutdown after training')
-    args = parser.parse_args()
-    analysis.train(args)
+    arguments = {# model components
+                 'run_name':run_name,
+                 'optimizer':optimizer,
+                 'criterion':criterion,
+                 # Hyperparameters
+                 'n_epochs':n_epochs,
+                 'batch_size':batch_size,
+                 'l_rate':init_l_rate,
+                 'l_rate_decay':l_rate_decay,
+                 'l_rate_decay_epoch':l_rate_decay_epoch,
+                 'w_decay':w_decay,
+                 # Saving & Information retrieval
+                 'report_interval':report_results_per_n_batches,
+                 'save_interval':save_interval,
+                 'shutdown':shutdown_after
+                }
+
+    analysis.train(arguments)

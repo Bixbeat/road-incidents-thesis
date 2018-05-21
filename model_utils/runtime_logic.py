@@ -81,7 +81,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             optimizer.step()
         return(loss.data[0])
 
-    def train(self, args):
+    def train(self, settings):
         """Performs model training
         Args:
         --run_name,           type=str,     'Name used for storage & metadata purposes'
@@ -101,30 +101,30 @@ class AnnotatedImageAnalysis(ImageAnalysis):
 
         if torch.cuda.is_available():
             self.model = torch.nn.DataParallel(self.model, device_ids=range(torch.cuda.device_count()))
-            criterion = args.criterion.cuda()
+            criterion = settings['criterion'].cuda()
         else:
-            criterion = args.criterion
+            criterion = settings['criterion']
 
-        optimizer = args.optimizer(self.model.parameters(), lr=args.l_rate, weight_decay=args.w_decay)
+        optimizer = settings['optimizer'](self.model.parameters(), lr=settings['l_rate'], weight_decay=settings['w_decay'])
 
-        for epoch in range(args.n_epoch):
+        for epoch in range(settings['n_epochs']):
             epoch_train_loss = 0
 
             model = self.model.train()
             train_epoch_start = dt.datetime.now()
 
             # Use either scheduled decay or decay at plateau
-            if args.l_rate_decay_epoch:
-                analysis_utils.exp_lr_scheduler(optimizer, epoch, args.l_rate_decay, args.l_rate_decay_epoch)
+            if settings['l_rate_decay_epoch']:
+                analysis_utils.exp_lr_scheduler(optimizer, epoch, settings['l_rate_decay'], settings['l_rate_decay_epoch'])
             elif self.loss_tracker.is_loss_at_plateau(epochs_until_decay=8) is True:
-                analysis_utils.decay_learning_rate(optimizer, args.lr_decay)
+                analysis_utils.decay_learning_rate(optimizer, settings['lr_decay'])
 
             for i, batch in enumerate(self.train_loader):
                 batch_loss = self.get_batch_loss(batch, model, criterion, optimizer)
 
                 epoch_train_loss += batch_loss
 
-                if (i+1) % args.report_interval['train'] == 0:
+                if (i+1) % settings['report_interval']['train'] == 0:
                     print(f'Train {epoch+1}: [{i} of {len(self.train_loader)}] : {epoch_train_loss/(i+1):.4f}')
                     # TODO
                     # img, pred = visualise.encoded_img_and_lbl_to_data(image, pred, self.means, self.sdevs)
@@ -146,17 +146,17 @@ class AnnotatedImageAnalysis(ImageAnalysis):
 
             # Validate model at every epoch if val loader is present           
             if self.val_loader is not None:
-                self.validate(criterion, args)
+                self.validate(criterion, settings)
                 self.vis_data.custom_combined_loss_plot(self.combined_loss_window, self.loss_tracker.all_loss['train'], self.loss_tracker.all_loss['val'])
 
-            if epoch_now % args.save_interval == 0 and self.loss_tracker.store_models is True:
+            if epoch_now % settings['save_interval'] == 0 and self.loss_tracker.store_models is True:
                 self.loss_tracker.save_model(model, epoch)
 
         # Shutdown after the final epoch
-        if args.shutdown is True:
+        if settings['shutdown'] is True:
             os.system("shutdown")
 
-    def validate(self, criterion, args):
+    def validate(self, criterion, settings):
         """For a given model, evaluation criterion,
         and validation loader, performs a single evaluation
         pass."""
@@ -171,7 +171,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             batch_loss = self.get_batch_loss(batch, eval_model, criterion)
             epoch_val_loss += batch_loss
 
-            if (i+1) % args.report_interval['val'] == 0:
+            if (i+1) % settings['report_interval']['val'] == 0:
                 print(f"Val [{i} of {len(self.val_loader)}] : {epoch_val_loss/(i+1):.4f}")
                 # Plot predictions
                 # preds = analysis_utils.get_predictions(outputs)
