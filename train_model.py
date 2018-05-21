@@ -94,6 +94,7 @@ if __name__ == "__main__":
                  'run_name':run_name,
                  'optimizer':optimizer,
                  'criterion':criterion,
+                 
                  # Hyperparameters
                  'n_epochs':n_epochs,
                  'batch_size':batch_size,
@@ -101,6 +102,7 @@ if __name__ == "__main__":
                  'l_rate_decay':l_rate_decay,
                  'l_rate_decay_epoch':l_rate_decay_epoch,
                  'w_decay':w_decay,
+                 
                  # Saving & Information retrieval
                  'report_interval':report_results_per_n_batches,
                  'save_interval':save_interval,
