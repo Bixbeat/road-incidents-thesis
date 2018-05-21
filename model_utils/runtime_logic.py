@@ -131,7 +131,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
                 epoch_train_loss += batch_loss
 
                 if settings['visualiser'] == 'tensorboard':
-                    self.writer.add_graph(model, batch)
+                    self.writer.add_graph_onnx(model, batch)
 
                 if (i+1) % settings['report_interval']['train'] == 0:
                     print(f'Train {epoch+1}: [{i} of {len(self.train_loader)}] : {epoch_train_loss/(i+1):.4f}')
@@ -181,7 +181,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             epoch_val_loss += batch_loss
 
             if settings['visualiser'] == 'tensorboard':
-                self.writer.add_graph(eval_model, batch)            
+                self.writer.add_graph_onnx(eval_model, batch)            
 
             if (i+1) % settings['report_interval']['val'] == 0:
                 print(f"Val [{i} of {len(self.val_loader)}] : {epoch_val_loss/(i+1):.4f}")
