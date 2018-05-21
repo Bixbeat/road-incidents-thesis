@@ -99,7 +99,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         if settings['visualiser'] == 'visdom':
             self.initialize_visdom_visualisation()
         else:
-            self.writer = SummaryWriter()
+            self.writer = SummaryWriter('/tmp/log')
         
         # Setup loss
         if self.loss_tracker.store_loss is True:
