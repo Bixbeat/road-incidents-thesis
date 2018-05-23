@@ -7,9 +7,9 @@ Sources:
 import os, os.path
 import numpy as np
 import scipy.misc as misc
-from shutil import copyfile
+import shutil
 
-from PIL import Image
+from PIL import Image, ImageOps
 
 def get_normalize_params(all_image_filepaths, num_bands):
     """For a set of image filepaths, returns the mean
@@ -66,29 +66,18 @@ def sync_img_and_lbls(root_dir, src_data_root, img_path, lbl_path):
     for file_path in all_imgs:
         file = os.path.basename(file_path)
         missing_lbl = root_dir + src_data_root + "labels/" + file
-        copyfile(missing_lbl, root_dir + lbl_path + '/' + file)
+        shutil.copyfile(missing_lbl, root_dir + lbl_path + '/' + file)
     
     for file_path in all_lbls:
         file = os.path.basename(file_path)
         missing_img = root_dir + src_data_root + "tiles/" + file
-        copyfile(missing_img, root_dir + img_path + '/' + file)
+        shutil.copyfile(missing_img, root_dir + img_path + '/' + file)
 
-def replace_imgs_with_thumbnails(root_dir, width=400):
-    for folder, _, imgs in os.walk(root_dir):
-        for image_path in imgs:
-            if is_image(image_path):
-                # Credit: https://stackoverflow.com/questions/273946/how-do-i-resize-an-image-using-pil-and-maintain-its-aspect-ratio
-                full_img_path = os.path.join(folder, image_path)
-                
-                try:
-                    img = Image.open(full_img_path)
-                except Exception as e:
-                    print(Exception)
-
-                wpercent = (width/float(img.size[0]))
-                hsize = int((float(img.size[1])*float(wpercent)))
-                img = img.resize((width,hsize), Image.ANTIALIAS)
-                img.save(os.path.join(folder, image_path))
+def img_to_thumbnail(pil_img, width=400):
+    # Credit: https://stackoverflow.com/questions/273946/how-do-i-resize-an-image-using-pil-and-maintain-its-aspect-ratio
+    wpercent = (width/float(pil_img.size[0]))
+    hsize = int((float(pil_img.size[1])*float(wpercent)))
+    return(pil_img.resize((width,hsize), Image.ANTIALIAS))
 
 def delete_equal_images_in_same_folder(root_dir):
     total_deleted = 0
@@ -132,17 +121,38 @@ def is_image(file_path):
     _, file_extension = os.path.splitext(file_path)
     return (file_extension.lower() in ['.png','.jpg','.jpeg','.tif','.tiff','.gif'])
 
+def zero_pad_img(pil_img, target_size):
+    fitted_img = ImageOps.fit(pil_img, (target_size, target_size))
+    return(fitted_img)    
+
 def del_image_if_equal(img_path_1, img_path_2):
     img_1 = Image.open(img_path_1)
     img_2 = Image.open(img_path_2)
     remove_path = False
-
     if img_1 == img_2 and img_path_1 != img_path_2:
         print(f'{img_path_1} is equal to {img_path_2} \n')
         os.remove(img_path_2)
         remove_path = True
-        
     img_1.close()
     img_2.close()
-    
-    return remove_path
+    return(remove_path)
+
+def image_to_dataloader_folders(dataloader_root, img_class, img_split, img_path, output_img_width='original', equal_aspect=False):
+    img_name = os.path.basename(img_path)
+    target_img_path = os.path.join(dataloader_root, img_class, img_split, img_name)
+    if output_img_width != 'original':
+        try:
+            img_to_resize = Image.open(img_path)
+            resized_img = img_to_thumbnail(img_to_resize, output_img_width)
+            if equal_aspect:
+                img_to_equal_resize = ImageOps.fit(resized_img, (output_img_width, output_img_width))
+                img_to_equal_resize.save(target_img_path)
+            else:
+                resized_img.save(target_img_path)
+        except FileNotFoundError as e:
+            print(f'file not found: {e}\n')        
+    else:
+        try:
+            shutil.copyfile(img_path, target_img_path)
+        except shutil.Error as e:
+            print(f'Cannot copy file: {e}\n')
