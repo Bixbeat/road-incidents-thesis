@@ -100,7 +100,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         """
         if settings['visualiser'] == 'visdom':
             self.initialize_visdom_visualisation()
-        elif settings['visualizer'] == 'tensorboard':
+        elif settings['visualiser'] == 'tensorboard':
             self.writer = SummaryWriter('/tmp/log')
         
         # Setup loss
