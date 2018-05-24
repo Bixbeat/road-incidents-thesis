@@ -18,6 +18,7 @@ class LossRecorder():
         self.store_loss = False
         self.loss_files = {'train':'', 'val':''}
         self.all_loss = {'train':np.array([]), 'val':np.array([])}
+        self.accuracy = {'train':np.array([]), 'val':np.array([])}
         
     def setup_output_storage(self, run_name, store_models=True, store_loss=True):
         self.run_name = run_name
@@ -86,6 +87,12 @@ def decay_learning_rate(optimizer, lr_decay):
     for param_group in optimizer.param_groups:
         param_group['lr'] *= lr_decay
     return optimizer
+
+def add_accuracy(accuracy_list, preds, labels, batch_length):
+    total_correct_in_batch = int(torch.sum(preds == labels))
+    correct_ratio_in_batch = float(total_correct_in_batch/batch_length)
+    accuracy_list.append(correct_ratio_in_batch)
+    return(accuracy_list)  
 
 def weights_init(m):
     """For all convolutional layers in a model,
