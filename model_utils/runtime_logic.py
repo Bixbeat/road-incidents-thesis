@@ -106,7 +106,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             self.loss_tracker.set_loss_file('train')
 
         if torch.cuda.is_available():
-            self.model = torch.nn.DataParallel(self.model, device_ids=range(torch.cuda.device_count()))
+            self.model = self.model.cuda()
             criterion = settings['criterion'].cuda()
         else:
             criterion = settings['criterion']
