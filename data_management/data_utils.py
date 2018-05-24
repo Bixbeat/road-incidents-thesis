@@ -87,11 +87,11 @@ def generate_random_filename(length=10):
 def create_dataloader_folders(root_dir, data_folder_name, classes):
     data_root = os.path.join(root_dir, data_folder_name)
     create_dir_if_not_exist(data_root)
-    for c in classes:
-        class_root = os.path.join(data_root, c)
-        create_dir_if_not_exist(c)
-
-        create_dir_if_not_exist(os.path.join(class_root, 'train'))
-        create_dir_if_not_exist(os.path.join(class_root, 'val'))
-        create_dir_if_not_exist(os.path.join(class_root, 'test'))
+    splits = ['train', 'val', 'test']
+    for split in splits:
+        split_folder = os.path.join(data_root, split)
+        create_dir_if_not_exist(split_folder)
+        for c in classes:
+            class_folder = os.path.join(split_folder, c)
+            create_dir_if_not_exist(class_folder)
 
