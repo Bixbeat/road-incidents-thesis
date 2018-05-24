@@ -21,27 +21,27 @@ if __name__ == "__main__":
     run_name = "ResNet18"
     data_dir = 'hymenoptera_data'
 
-    n_epochs = 250
+    n_epochs = 100
     workers = 4
 
-    init_l_rate = 1e-5
+    init_l_rate = 1e-3
     l_rate_decay = 0.1
     l_rate_decay_epoch = False # [25, 80, 200]
+    l_rate_decay_patience = 4
     w_decay = 1e-4
     
-    batch_size = 1
+    batch_size = 5
     num_channels = 3
-    num_classes = 3
+    num_classes = 8
     
-    optimizer = optim.SGD
+    optimizer = optim.Adagrad
     criterion = nn.CrossEntropyLoss()
     
     shutdown_after = False
     report_results_per_n_batches = {'train':20, 'val':5}
     save_interval = 9999
-    visualiser = 'tensorboard'
-    
-    
+    visualiser = 'visdom' # Visdom for local, Tensorboard for Colaboratory.
+
 # =============================================================================
 #   LOAD MODEL
 # =============================================================================
@@ -49,12 +49,14 @@ if __name__ == "__main__":
     num_ftrs = model.fc.in_features
     model.fc = nn.Linear(num_ftrs, num_classes)    
 
+    # Set optimizer
+    optimizer = optimizer(model.parameters(), lr=init_l_rate, weight_decay=w_decay)
 # =============================================================================
 #   DATA LOADING
 # =============================================================================
 
     all_image_filepaths = i_manips.get_images(os.path.join(data_dir, 'train'))
-    norm_params = i_manips.get_normalize_params(all_image_filepaths, 3)
+    norm_params = i_manips.get_normalize_params(all_image_filepaths, num_channels)
     means = norm_params['means']
     sdevs = norm_params['sdevs']
 
@@ -98,10 +100,9 @@ if __name__ == "__main__":
                  # Hyperparameters
                  'n_epochs':n_epochs,
                  'batch_size':batch_size,
-                 'l_rate':init_l_rate,
                  'l_rate_decay':l_rate_decay,
                  'l_rate_decay_epoch':l_rate_decay_epoch,
-                 'w_decay':w_decay,
+                 'l_rate_decay_patience':l_rate_decay_patience,
                  
                  # Saving & Information retrieval
                  'report_interval':report_results_per_n_batches,
