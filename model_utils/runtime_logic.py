@@ -127,7 +127,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
                 batch_loss, preds = self.get_batch_loss_and_preds(images, labels, model, criterion, optimizer)
 
                 epoch_train_loss += batch_loss
-                analysis_utils.add_accuracy(train_batch_accuracies, preds, Variable(batch[1]), len(preds))
+                analysis_utils.add_accuracy(train_batch_accuracies, preds, labels, len(preds))
 
                 if (i+1) % settings['report_interval']['train'] == 0:
                     print(f"Train {epoch+1}: [{i} of {len(self.train_loader)}] : {epoch_train_loss/(i+1):.4f}")
@@ -186,7 +186,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             images, labels = analysis_utils.imgs_labels_to_variables(batch[0], batch[1])
             batch_loss, preds = self.get_batch_loss_and_preds(images, labels, eval_model, criterion)
             epoch_val_loss += batch_loss
-            analysis_utils.add_accuracy(val_batch_accuracies, preds, Variable(batch[1]), len(preds))
+            analysis_utils.add_accuracy(val_batch_accuracies, preds, labels, len(preds))
 
 
             if (i+1) % settings['report_interval']['val'] == 0:
