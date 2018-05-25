@@ -74,10 +74,9 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         self.loss_tracker = analysis_utils.LossRecorder()
         self.writer = None
 
-    def get_batch_loss_and_preds(self, batch, model, criterion, optimizer=None):
+    def get_batch_loss_and_preds(self, images, labels, model, criterion, optimizer=None):
         if optimizer:
             optimizer.zero_grad()
-        images, labels = analysis_utils.imgs_labels_to_variables(batch[0], batch[1])
         outputs = model(images)
         _, preds = torch.max(outputs, 1)
         loss = criterion(outputs, labels)
@@ -107,11 +106,8 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         if self.loss_tracker.store_loss is True:
             self.loss_tracker.set_loss_file('train')
 
-        if torch.cuda.is_available():
-            self.model = self.model.cuda() # torch.nn.DataParallel(self.model, device_ids=range(torch.cuda.device_count()))
-            criterion = settings['criterion'].cuda()
-        else:
-            criterion = settings['criterion']
+        criterion = settings['criterion']
+        optimizer = settings['optimizer']
 
         for epoch in range(settings['n_epochs']):
             epoch_train_loss = 0
@@ -122,12 +118,13 @@ class AnnotatedImageAnalysis(ImageAnalysis):
 
             # Use either scheduled decay or decay at plateau
             if settings['l_rate_decay_epoch']:
-                analysis_utils.exp_lr_scheduler(settings['optimizer'], epoch, settings['l_rate_decay'], settings['l_rate_decay_epoch'])
+                analysis_utils.exp_lr_scheduler(optimizer, epoch, settings['l_rate_decay'], settings['l_rate_decay_epoch'])
             elif self.loss_tracker.is_loss_at_plateau(epochs_until_decay=settings['l_rate_decay_patience']) is True:
-                analysis_utils.decay_learning_rate(settings['optimizer'], settings['lr_decay'])
+                analysis_utils.decay_learning_rate(optimizer, settings['lr_decay'])
 
             for i, batch in enumerate(self.train_loader):
-                batch_loss, preds = self.get_batch_loss_and_preds(batch, model, criterion, settings['optimizer'])
+                images, labels = analysis_utils.imgs_labels_to_variables(batch[0], batch[1])
+                batch_loss, preds = self.get_batch_loss_and_preds(images, labels, model, criterion, optimizer)
 
                 epoch_train_loss += batch_loss
                 analysis_utils.add_accuracy(train_batch_accuracies, preds, Variable(batch[1]), len(preds))
@@ -186,7 +183,8 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             self.loss_tracker.set_loss_file('val')
 
         for i, batch in enumerate(self.val_loader):
-            batch_loss, preds = self.get_batch_loss_and_preds(batch, eval_model, criterion)
+            images, labels = analysis_utils.imgs_labels_to_variables(batch[0], batch[1])
+            batch_loss, preds = self.get_batch_loss_and_preds(images, labels, eval_model, criterion)
             epoch_val_loss += batch_loss
             analysis_utils.add_accuracy(val_batch_accuracies, preds, Variable(batch[1]), len(preds))
 

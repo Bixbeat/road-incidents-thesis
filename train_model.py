@@ -34,7 +34,6 @@ if __name__ == "__main__":
     num_channels = 3
     num_classes = 8
     
-    optimizer = optim.Adagrad
     criterion = nn.CrossEntropyLoss()
     
     shutdown_after = False
@@ -49,8 +48,11 @@ if __name__ == "__main__":
     num_ftrs = model.fc.in_features
     model.fc = nn.Linear(num_ftrs, num_classes)    
 
-    # Set optimizer
-    optimizer = optimizer(model.parameters(), lr=init_l_rate, weight_decay=w_decay)
+    if torch.cuda.is_available():
+        model = model.cuda()
+        criterion = criterion.cuda()
+    
+    optimizer = optim.Adam(model.parameters(), lr=init_l_rate, weight_decay=w_decay)
 # =============================================================================
 #   DATA LOADING
 # =============================================================================
