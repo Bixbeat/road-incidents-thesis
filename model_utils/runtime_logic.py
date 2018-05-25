@@ -143,7 +143,6 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             avg_epoch_train_loss = epoch_train_loss/(i+1)
             self.loss_tracker.save_loss_if_enabled(self.loss_tracker.loss_files['train'], avg_epoch_train_loss, epoch_now)
             self.loss_tracker.all_loss['train'] = np.append(self.loss_tracker.all_loss['train'], avg_epoch_train_loss)
-            self.loss_tracker.all_loss['val'] = np.append(self.loss_tracker.accuracy['val'], epoch_train_accuracy)
 
             # Validate model at every epoch if val loader is present           
             if self.val_loader is not None:
@@ -188,7 +187,6 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             epoch_val_loss += batch_loss
             analysis_utils.add_accuracy(val_batch_accuracies, preds, labels, len(preds))
 
-
             if (i+1) % settings['report_interval']['val'] == 0:
                 print(f"Val [{i} of {len(self.val_loader)}] : {epoch_val_loss/(i+1):.4f}")
                 # Plot predictions
@@ -207,10 +205,10 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         epoch_val_accuracy = np.mean(val_batch_accuracies)
         self.loss_tracker.save_loss_if_enabled(self.loss_tracker.loss_files['val'], avg_epoch_val_loss, epoch_now)
         self.loss_tracker.all_loss['val'] = np.append(self.loss_tracker.all_loss['val'], avg_epoch_val_loss)
-        self.loss_tracker.all_loss['val'] = np.append(self.loss_tracker.accuracy['val'], epoch_val_accuracy)
+        self.loss_tracker.accuracy['val'] = np.append(self.loss_tracker.accuracy['val'], epoch_val_accuracy)
 
         # Save model if best accuracy
-        if len(self.loss_tracker.accuracy['val']) > 0 and self.loss_tracker.store_models is True:
+        if len(self.loss_tracker.all_loss['val']) > 0 and self.loss_tracker.store_models is True:
             if avg_epoch_val_loss > max(self.loss_tracker.all_loss['val']):
                 self.loss_tracker.save_model(eval_model, 'best')
 
