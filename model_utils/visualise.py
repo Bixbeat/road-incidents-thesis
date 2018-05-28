@@ -210,10 +210,6 @@ class CamExtractor():
         return conv_output, x
 
     def forward_pass(self, x):
-        """
-            Does a full forward pass on the model
-        """
-        # Forward pass on the convolutions
         conv_output, x = self.forward_pass_on_convolutions(x)
         return conv_output, x
 
@@ -222,47 +218,45 @@ class GradCam():
         Produces class activation map
     """
     def __init__(self, model, target_layer):
-        self.model = model
-        self.model.eval()
-        # Define extractor
-        self.extractor = CamExtractor(self.model, target_layer)
+        self.model = model.eval()
+        self.extractor = CamExtractor(self.model, target_layer)       
 
-    def generate_cam(self, input_image, out_img_size, means, sdevs, target_class=None):
-        # Full forward pass
-        # conv_output is the output of convolutions at specified layer
-        # model_output is the final output of the model (1, 1000)
+    def generate_cam(self, input_image, means, sdevs, out_img_size=224, cam_transparency=0.5, unnormalize=True, target_class=None):
         conv_output, model_output = self.extractor.forward_pass(input_image)
         if target_class is None:
             target_class = np.argmax(model_output.data.numpy())
-        
-        # Target for backprop
-        one_hot_output = torch.FloatTensor(1, model_output.size()[-1]).zero_()
-        one_hot_output[0][target_class] = 1
-
         self.model.zero_grad()
-        # Backward pass with specified target
-        model_output.backward(gradient=one_hot_output, retain_graph=True)
-        # Get hooked gradients
-        guided_gradients = self.extractor.gradients.data.numpy()[0]
-        # Get convolution outputs
-        target_conv = conv_output.data.numpy()[0]
-        # Get weights from gradients
-        weights = np.mean(guided_gradients, axis=(1, 2))  # Take averages for each gradient
-        # Create empty numpy array for cam
-        cam = np.ones(target_conv.shape[1:], dtype=np.float32)
-        # Multiply each weight with its conv output and then, sum
-        for i, w in enumerate(weights):
-            cam += w * target_conv[i, :, :]
 
-        input_image = var_to_cpu(input_image)
+        original_img = var_to_cpu(input_image).data[0]
+        if unnormalize:
+            original_img = normalized_img_tensor_to_pil(original_img, means, sdevs)
 
-        cam_normalized = (cam - np.min(cam)) / (np.max(cam) - np.min(cam))
-        cam_colourized = colourize_gradient(cam_normalized)[:, :, :3]
-        cam_img = Image.fromarray(np.uint8(cam_colourized*255))
-        cam_resized = ImageOps.fit(cam_img, (out_img_size, out_img_size))
-        target_img = normalized_img_tensor_to_pil(input_image.data[0], means, sdevs)
-        cam_overlaid = Image.blend(target_img, cam_resized, 0.6)
+        cam = self.results_to_cam(conv_output, model_output, target_class)
+        cam_heatmap = self.cam_array_to_heatmap(cam, out_img_size)
+
+        cam_overlaid = Image.blend(cam_heatmap, original_img, cam_transparency)
         return cam_overlaid
+
+    def results_to_cam(self, conv_output, model_output, target_class):
+        one_hot_output = torch.FloatTensor(1, model_output.size()[-1]).zero_()
+        one_hot_output[0][target_class] = 1 # Backprop target
+
+        model_output.backward(gradient=one_hot_output, retain_graph=True)
+        guided_gradients = self.extractor.gradients.data.numpy()[0]
+        target_conv = conv_output.data.numpy()[0]
+        weights = np.mean(guided_gradients, axis=(1, 2))  # Take averages for each gradient
+        
+        cam = np.ones(target_conv.shape[1:], dtype=np.float32)
+        for i, w in enumerate(weights):
+            cam += w * target_conv[i, :, :] # Multiply weights with conv output and sum
+        return cam
+
+    def cam_array_to_heatmap(self, cam_array, out_img_size):
+        cam_normalized = (cam_array - np.min(cam_array)) / (np.max(cam_array) - np.min(cam_array))
+        cam_coloured = colourize_gradient(cam_normalized)[:, :, :3]
+        cam_img = Image.fromarray(np.uint8(cam_coloured*255))
+        cam_resized = ImageOps.fit(cam_img, (out_img_size, out_img_size))
+        return cam_resized
 
 def colourize_gradient(img_array):
     colour = mpl.cm.get_cmap('rainbow')
