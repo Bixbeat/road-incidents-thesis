@@ -1,8 +1,13 @@
+"""Grad-cam by Utku Ozbulak - github.com/utkuozbulak"""
+
 import visdom
 import torch
+from torchvision.transforms import Normalize, ToPILImage
 import numpy as np
+from PIL import Image, ImageOps
 import datetime as dt
 import time as t
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from tensorboardX import SummaryWriter
 
@@ -81,10 +86,11 @@ class VisdomVisualiser():
         timetracker = self.vis.text("<b>Starting time:</b> {}".format(self.start_time.replace(microsecond=0)))
         return timetracker
 
-    def vis_img_window(self):
-        """UNUSED: initialises a visdom image window"""
-        img_window = self.vis.images(np.random.rand(3, 4, 4))
-        return img_window
+    def vis_img_window(self, win_id):
+        img_window = self.vis.image(np.random.rand(3, 224, 224), opts=dict(title='CAM window', caption='Class goes here', win=win_id))
+
+    def update_img_window(self, img_window, img, title, caption):
+        img_window = self.vis.image(img, opts=dict(win=img_window, title=title, caption=caption))
 
     def custom_update_loss_plot(self, loss_window, loss, color='#ffa500', marker_size=3, title='plot'):
         """For a given visdom window, creates a plot for a single loss trace"""
@@ -172,8 +178,104 @@ class VisdomVisualiser():
 
 def _remove_microseconds(time_delta):
     return time_delta - dt.timedelta(microseconds=time_delta.microseconds)
-            
+
+class CamExtractor():
+    """
+        Extracts cam features from the model
+    """
+    def __init__(self, model, target_layer):
+        self.model = model
+        self.target_layer = target_layer
+        self.gradients = None
+
+    def save_gradient(self, grad):
+        self.gradients = grad
+
+    def forward_pass_on_convolutions(self, x):
+        """
+            Does a forward pass on convolutions, hooks the function at given layer
+        """
+        conv_output = None
+        layer = self.model._modules.get(self.target_layer)
+
+        for module_pos, module in self.model._modules.items():
+            if module_pos == 'fc':
+                x = x.view(x.size(0), -1)            
+            x = module(x)  # Forward
+            if module_pos == self.target_layer:
+                x.register_hook(self.save_gradient)
+                conv_output = x  # Save the convolution output on that layer
+        return conv_output, x
+
+    def forward_pass(self, x):
+        """
+            Does a full forward pass on the model
+        """
+        # Forward pass on the convolutions
+        conv_output, x = self.forward_pass_on_convolutions(x)
+        return conv_output, x
+
+class GradCam():
+    """
+        Produces class activation map
+    """
+    def __init__(self, model, target_layer):
+        self.model = model
+        self.model.eval()
+        # Define extractor
+        self.extractor = CamExtractor(self.model, target_layer)
+
+    def generate_cam(self, input_image, out_img_size, means, sdevs, target_class=None):
+        # Full forward pass
+        # conv_output is the output of convolutions at specified layer
+        # model_output is the final output of the model (1, 1000)
+        conv_output, model_output = self.extractor.forward_pass(input_image)
+        if target_class is None:
+            target_class = np.argmax(model_output.data.numpy())
         
+        # Target for backprop
+        one_hot_output = torch.FloatTensor(1, model_output.size()[-1]).zero_()
+        one_hot_output[0][target_class] = 1
+        
+        self.model.zero_grad()
+         
+        # Backward pass with specified target
+        model_output.backward(gradient=one_hot_output, retain_graph=True)
+        # Get hooked gradients
+        guided_gradients = self.extractor.gradients.data.numpy()[0]
+        # Get convolution outputs
+        target = conv_output.data.numpy()[0]
+        # Get weights from gradients
+        weights = np.mean(guided_gradients, axis=(1, 2))  # Take averages for each gradient
+        # Create empty numpy array for cam
+        cam = np.ones(target.shape[1:], dtype=np.float32)
+        # Multiply each weight with its conv output and then, sum
+        for i, w in enumerate(weights):
+            cam += w * target[i, :, :]
+        
+        cam_normalized = (cam - np.min(cam)) / (np.max(cam) - np.min(cam))
+        cam_colourized = colourize_gradient(cam_normalized)[:, :, :3]
+        cam_img = Image.fromarray(np.uint8(cam_colourized*255))
+        cam_resized = ImageOps.fit(cam_img, (out_img_size, out_img_size))
+        target_img = normalized_img_tensor_to_pil(input_image.data[0], means, sdevs)
+        cam_overlaid = Image.blend(target_img, cam_resized, 0.6)
+        return cam_overlaid
+
+def colourize_gradient(img_array):
+    colour = mpl.cm.get_cmap('rainbow')
+    coloured_img = colour(img_array)
+    return coloured_img
+
+def normalized_img_tensor_to_pil(img_tensor, means, sdevs):
+    bands = len(means)
+    to_pil = ToPILImage()
+    inverse_normalize = Normalize(
+        mean =[-means[band]/sdevs[band] for band in range(bands)],
+        std=[1/sdevs[band] for band in range(bands)]
+    )
+    inverse_tensor = inverse_normalize(img_tensor)      
+    return to_pil(inverse_tensor)
+
 if __name__ == '__main__':
     visualize_loss = Visualiser()
     
@@ -197,4 +299,4 @@ if __name__ == '__main__':
     epoch_end = dt.datetime.now()
     epoch_time = epoch_end-epoch_start
     epoch_spd = epoch_time/10
-    visualize_loss.update_timer("Training",timebox, epoch_start, epoch_time, epoch_spd)
+    visualize_loss.update_timer("Training",timebox, epoch_start, epoch_time, epoch_spd)    

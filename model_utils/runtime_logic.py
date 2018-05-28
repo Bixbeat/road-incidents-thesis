@@ -10,16 +10,17 @@ import scipy.misc as misc
 import torch
 import torch.nn as nn
 from torch.optim import SGD, Adam, RMSprop
-from torchvision.transforms import Compose, Normalize
+from torchvision.transforms import Compose, Normalize, ToTensor
 from torchvision.transforms import ToTensor
 from torch.autograd import Variable
 from tensorboardX import SummaryWriter
+from PIL import Image
 
 from data_management import data_utils
 
 
 class ImageAnalysis(object):
-    def __init__(self, model, train_loader=None, val_loader=None, means=None, sdevs=None):
+    def __init__(self, model, classes, train_loader=None, val_loader=None, means=None, sdevs=None):
         ## Model components
         self.model = model
         self.train_loader = train_loader
@@ -28,7 +29,8 @@ class ImageAnalysis(object):
         ## Norm-parameters
         self.means = means
         self.sdevs = sdevs
-        
+        self.classes = classes
+
         ## Timing
         self.start_time = dt.datetime.now()
 
@@ -43,6 +45,7 @@ class ImageAnalysis(object):
             self.val_loss_window = self.vis_data.vis_plot_loss('val')
             self.val_timebox = self.vis_data.vis_create_timetracker(self.start_time)
             self.combined_loss_window = self.vis_data.vis_plot_loss("combined")
+            self.cam_window = self.vis_data.vis_img_window('cam_val')
 
     def update_loss_values(self, all_recorded_loss, loss_plot_window):
         self.vis_data.custom_update_loss_plot(loss_plot_window, all_recorded_loss, title="<b>Training loss</b>", color='#0000ff')
@@ -56,8 +59,8 @@ class ImageAnalysis(object):
 class AnnotatedImageAnalysis(ImageAnalysis):
     """Performs semantic segmentation
     TODO: refactor repeated code (e.g. timekeeping)"""
-    def __init__(self, model, means, sdevs, train_loader=None, val_loader=None):    
-        super().__init__(model, train_loader, val_loader, means, sdevs)
+    def __init__(self, model, classes, means, sdevs, train_loader=None, val_loader=None):    
+        super().__init__(model, classes, train_loader, val_loader, means, sdevs)
         self.model = model
         self.train_loader = train_loader
         self.val_loader = val_loader
@@ -110,6 +113,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         optimizer = settings['optimizer']
 
         for epoch in range(settings['n_epochs']):
+            epoch_now = epoch+1
             epoch_train_loss = 0
             train_batch_accuracies = []
 
@@ -135,7 +139,6 @@ class AnnotatedImageAnalysis(ImageAnalysis):
                     # img, pred = visualise.encoded_img_and_lbl_to_data(image, pred, self.means, self.sdevs)
                     # visualise.plot_pairs(img, pred)
 
-            epoch_now = epoch+1
             total_train_batches = len(self.train_loader)
             epoch_train_accuracy = np.mean(train_batch_accuracies)
 
@@ -216,9 +219,28 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         if settings['visualiser'] == 'visdom':
             self.update_vis_timer("<b>Validation</b>", val_epoch_start, total_val_batches,self.val_timebox)
             self.vis_data.custom_update_loss_plot(self.val_loss_window, self.loss_tracker.all_loss['val'], title="<b>Validation loss</b>")
+            
         elif settings['visualiser'] == 'tensorboard':
             self.writer.add_scalar('Val/Loss', avg_epoch_val_loss, epoch_now)
             self.writer.add_scalar('Val/Accuracy', epoch_val_accuracy, epoch_now)
+
+        if settings['cam_layer'] != None:
+            target_img = images[0].unsqueeze(0)
+            img_class = int(labels[0].data.numpy())
+            cam_extractor = visualise.GradCam(self.model, settings['cam_layer'])
+            cam_img = cam_extractor.generate_cam(target_img, 224, self.means, self.sdevs, target_class = img_class)
+            to_tensor = ToTensor()
+            cam_tensor = to_tensor(cam_img)
+            if settings['visualiser'] == 'tensorboard':
+                self.writer.add_image('Image',  cam_tensor, epoch_now)
+            elif settings['visualiser'] == 'visdom':                            
+                # Function keeps plotting panes, phased out for now.
+                target_class = self.classes[img_class]
+                # Can't figure out a way to use the ndarray, instead we convert to PIL again
+                # self.vis_data.update_img_window(self.cam_window, cam_float_tensor,
+                #                                 f"CAM for layer {settings['cam_layer']}",
+                #                                 f"CAM for class {target_class}")                    
+
 
         print(f"Val accuracy: {epoch_val_accuracy:.4f}")
         print(f"Val final loss: {avg_epoch_val_loss}")
