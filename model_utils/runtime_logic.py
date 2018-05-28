@@ -88,6 +88,11 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             optimizer.step()
         return(loss.data[0], preds)
 
+    def var_to_cpu(self, var):
+        if var.is_cuda:
+            var = var.cpu()
+        return var
+
     def train(self, settings):
         """Performs model training
         Args:
@@ -225,8 +230,11 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             self.writer.add_scalar('Val/Accuracy', epoch_val_accuracy, epoch_now)
 
         if settings['cam_layer'] != None:
-            target_img = images[0].unsqueeze(0)
-            img_class = int(labels[0].data.numpy())
+            target_img_var = images[0].unsqueeze(0)
+            target_img = self.var_to_cpu(target_img_var)
+            img_class_tensor = self.var_to_cpu(labels[0].data)
+            img_class = int(img_class_tensor.numpy())
+
             cam_extractor = visualise.GradCam(self.model, settings['cam_layer'])
             cam_img = cam_extractor.generate_cam(target_img, 224, self.means, self.sdevs, target_class = img_class)
             to_tensor = ToTensor()
@@ -240,7 +248,6 @@ class AnnotatedImageAnalysis(ImageAnalysis):
                 # self.vis_data.update_img_window(self.cam_window, cam_float_tensor,
                 #                                 f"CAM for layer {settings['cam_layer']}",
                 #                                 f"CAM for class {target_class}")                    
-
 
         print(f"Val accuracy: {epoch_val_accuracy:.4f}")
         print(f"Val final loss: {avg_epoch_val_loss}")
