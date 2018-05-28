@@ -239,7 +239,7 @@ class GradCam():
         one_hot_output = torch.FloatTensor(1, model_output.size()[-1]).zero_()
         one_hot_output[0][target_class] = 1
         if input_image.is_cuda:
-            one_hot_output.cuda()
+            one_hot_output = one_hot_output.cuda()
 
         self.model.zero_grad()
         # Backward pass with specified target
