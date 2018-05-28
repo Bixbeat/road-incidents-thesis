@@ -224,14 +224,23 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             self.writer.add_scalar('Val/Accuracy', epoch_val_accuracy, epoch_now)
 
         if settings['cam_layer'] != None:
+            used_cuda = None
             img_class_tensor = analysis_utils.var_to_cpu(labels[0].data)
             img_class = int(img_class_tensor.numpy())
             target_img = images[0].unsqueeze(0)
 
+            if next(self.model.parameters()).is_cuda:
+                self.model = self.model.cpu()
+                used_cuda = True
+            
             cam_extractor = visualise.GradCam(self.model, settings['cam_layer'])
             cam_img = cam_extractor.generate_cam(target_img, 224, self.means, self.sdevs, target_class = img_class)
             to_tensor = ToTensor()
             cam_tensor = to_tensor(cam_img)
+
+            if used_cuda:
+                self.model = self.model.cuda()
+
             if settings['visualiser'] == 'tensorboard':
                 self.writer.add_image('Image',  cam_tensor, epoch_now)
             elif settings['visualiser'] == 'visdom':                            
