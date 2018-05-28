@@ -11,6 +11,8 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from tensorboardX import SummaryWriter
 
+from model_utils.analysis_utils import var_to_cpu
+
 def plot_pairs(image, label):
     """Takes an image tensor and its reconstruction vars, and
     argmaxed softmax predictions to create a 1x2 comparison plot."""
@@ -244,15 +246,18 @@ class GradCam():
         # Get hooked gradients
         guided_gradients = self.extractor.gradients.data.numpy()[0]
         # Get convolution outputs
-        target = conv_output.data.numpy()[0]
+        target_conv_var = var_to_cpu(conv_output)
+        target_conv = target_conv_var.data.numpy()[0]
         # Get weights from gradients
         weights = np.mean(guided_gradients, axis=(1, 2))  # Take averages for each gradient
         # Create empty numpy array for cam
-        cam = np.ones(target.shape[1:], dtype=np.float32)
+        cam = np.ones(target_conv.shape[1:], dtype=np.float32)
         # Multiply each weight with its conv output and then, sum
         for i, w in enumerate(weights):
-            cam += w * target[i, :, :]
-        
+            cam += w * target_conv[i, :, :]
+
+        input_image = var_to_cpu(input_image)
+
         cam_normalized = (cam - np.min(cam)) / (np.max(cam) - np.min(cam))
         cam_colourized = colourize_gradient(cam_normalized)[:, :, :3]
         cam_img = Image.fromarray(np.uint8(cam_colourized*255))

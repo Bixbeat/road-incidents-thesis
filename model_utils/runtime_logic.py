@@ -11,7 +11,6 @@ import torch
 import torch.nn as nn
 from torch.optim import SGD, Adam, RMSprop
 from torchvision.transforms import Compose, Normalize, ToTensor
-from torchvision.transforms import ToTensor
 from torch.autograd import Variable
 from tensorboardX import SummaryWriter
 from PIL import Image
@@ -87,11 +86,6 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             loss.backward()
             optimizer.step()
         return(loss.data[0], preds)
-
-    def var_to_cpu(self, var):
-        if var.is_cuda:
-            var = var.cpu()
-        return var
 
     def train(self, settings):
         """Performs model training
@@ -230,10 +224,9 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             self.writer.add_scalar('Val/Accuracy', epoch_val_accuracy, epoch_now)
 
         if settings['cam_layer'] != None:
-            target_img_var = images[0].unsqueeze(0)
-            target_img = self.var_to_cpu(target_img_var)
-            img_class_tensor = self.var_to_cpu(labels[0].data)
+            img_class_tensor = analysis_utils.var_to_cpu(labels[0].data)
             img_class = int(img_class_tensor.numpy())
+            target_img = images[0].unsqueeze(0)
 
             cam_extractor = visualise.GradCam(self.model, settings['cam_layer'])
             cam_img = cam_extractor.generate_cam(target_img, 224, self.means, self.sdevs, target_class = img_class)

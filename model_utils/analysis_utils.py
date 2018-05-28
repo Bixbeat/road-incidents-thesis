@@ -57,6 +57,12 @@ def set_dropout_probability(model, p=0):
         if type(module) is torch.nn.modules.dropout.Dropout2d:
             module.p = p
 
+def var_to_cpu(var):
+    if var.is_cuda:
+        var = var.cpu()
+    return var
+            
+
 def fix_state_dict(state_dict):
     """README: This is a cheap hack to fix model saving in PyTorch with the Densenet implementation.
     After updating to PyTorch 0.3 model saving was done with explicit 'module.-' prefixes

@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torchvision import models, datasets, transforms
 from torchvision.transforms import Compose, Normalize, ToTensor
+from copy import deepcopy
 
 from data_management import image_manipulations as i_manips
 from model_utils import runtime_logic
@@ -18,7 +19,7 @@ if __name__ == "__main__":
     seed = 0
     torch.cuda.manual_seed(seed)
 
-    run_name = "ResNet18"
+    run_name = "ResNet-test"
     data_dir = 'hymenoptera_data'
 
     n_epochs = 100
@@ -37,9 +38,10 @@ if __name__ == "__main__":
     criterion = nn.CrossEntropyLoss()
     
     shutdown_after = False
-    report_results_per_n_batches = {'train':20, 'val':5}
+    report_results_per_n_batches = {'train':1, 'val':5}
     save_interval = 9999
     visualiser = 'visdom' # Visdom for local, Tensorboard for Colaboratory.
+    cam_layer = 'conv1'
 
 # =============================================================================
 #   LOAD MODEL
@@ -85,10 +87,12 @@ if __name__ == "__main__":
     val_loader = torch.utils.data.DataLoader(val_data, batch_size=batch_size,
                                                 shuffle=True, num_workers=workers)                                                
 
+    classes = deepcopy(train_data.classes)
+
 # =============================================================================
 #   INITIALIZE RUNTIME CLASSES
 # =============================================================================
-    analysis = runtime_logic.AnnotatedImageAnalysis(model, means, sdevs, train_loader, val_loader)
+    analysis = runtime_logic.AnnotatedImageAnalysis(model, classes, means, sdevs, train_loader, val_loader)
     analysis.loss_tracker.setup_output_storage(run_name, 'outputs/')
 
 # =============================================================================
@@ -110,7 +114,8 @@ if __name__ == "__main__":
                  'report_interval':report_results_per_n_batches,
                  'save_interval':save_interval,
                  'shutdown':shutdown_after,
-                 'visualiser':visualiser
+                 'visualiser':visualiser,
+                 'cam_layer':cam_layer
                 }
 
     analysis.train(arguments)
