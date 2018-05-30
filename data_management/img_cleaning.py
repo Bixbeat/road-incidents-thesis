@@ -4,53 +4,19 @@ import sys
 
 import matplotlib.pyplot as plt
 from scipy import misc
-import sqlite3
 import time
 
 from data_management import exif_functions
 from data_management import image_manipulations as i_manips
-
-class ImgDatabaseHandler():
-    def __init__(self, db_root):
-        self.db = sqlite3.connect(db_root)
-        self.cursor = self.db.cursor()
-        self.previous_img_path = None
-        self.previous_geo = None
-        self.previous_time = None
-
-    def create_img_table(self, img_class):
-        try:
-            self.cursor.execute(f'''CREATE TABLE IF NOT EXISTS
-                                    {img_class}(img_id VARCHAR PRIMARY KEY, lat REAL, long REAL, datetime VARCHAR)''')
-            self.db.commit()
-        except Exception as e:
-            self.db.rollback()
-            raise e
-
-    def store_image_details(self, image_class, img_path, location, time):
-        try:
-            self.db.execute(f'INSERT INTO {image_class} VALUES (?,?,?,?)', [img_path, location[0], location[1], time])
-            self.db.commit()
-        except sqlite3.IntegrityError:
-            print('Record already exists')
-    
-    def remove_record(self, image_class, img_path):
-        try:
-            self.db.execute(f'DELETE FROM {image_class} WHERE img_id = (?)', [img_path])
-            self.db.commit()
-        except sqlite3.IntegrityError:
-            print('Cannot delete record')
-    
-    def get_all_records(self, table):
-        try:
-            return([record for record in self.cursor.execute(f'SELECT * FROM {table}')])
-        except sqlite3.IntegrityError:
-            print('Cannot load records')        
+from data_management.data_utils import ImgDatabaseHandler      
 
 class ImageCleaner():
-    def __init__(self, db_root):
+    def __init__(self, db_root, target_table):
         self.db_handler = ImgDatabaseHandler(db_root)
+        self.target_table = target_table
         self.previous_img_path = None
+        self.previous_geo = None
+        self.previous_time = None        
         self.current_index = 0
         
     def skip_to_folder(self, all_folders, folder_name):
@@ -60,7 +26,7 @@ class ImageCleaner():
             
 
     def clean_images(self, data_root, target_class, skip_to_folder_name=None):
-        self.db_handler.create_img_table(target_class)
+        self.db_handler.create_img_table(self.target_table)
         if skip_to_folder_name is not None:
             all_folders = [x[0] for x in walk(data_root)]
             folders_after_index = self.skip_to_folder(all_folders, skip_to_folder_name)
@@ -93,23 +59,26 @@ class ImageCleaner():
     def _handle_response(self, response, img_class, img_path):
         time = -9999
         geo = ['','']
-        if response in ['', '1']:
+        if response in ['', '1', '2']:
+            if response == '2': # Save image with different class name
+                img_class = str(input(f'Which alternative image class is this image?: '))            
+            
             img_exif = exif_functions.get_exif_if_exists(img_path)
             if img_exif:
                 exif_with_geo = exif_functions.decode_geo(img_exif)
                 if 'DateTimeOriginal' in img_exif.keys():
                     time = img_exif['DateTimeOriginal']
                 if 'GPSInfo' in img_exif.keys():
-                    geo = ['yes', 'yes']
-                    # To implement later
-
-            self.db_handler.store_image_details(img_class, img_path, geo, time)
+                    geo = ['yes', 'yes'] # To implement later
+            
+            self.db_handler.store_image_details(self.target_table, img_class, img_path, geo, time)            
+            
         elif response == 'sp':
-            self.db_handler.store_image_details(img_class, self.previous_img_path, self.previous_geo, self.previous_time)
+            self.db_handler.store_image_details(self.target_table, img_class, self.previous_img_path, self.previous_geo, self.previous_time)
             response = str(input(f'Is this image representative of class {img_class}?: '))
             self._handle_response(response, img_class, img_path)
         elif response == 'rp':
-            self.db_handler.remove_record(img_class, self.previous_img_path)
+            self.db_handler.remove_record(self.target_table, self.previous_img_path)
             response = str(input(f'Is this image representative of class {img_class}?: '))
             self._handle_response(response, img_class, img_path)
         elif response == '0':
