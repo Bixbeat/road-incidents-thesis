@@ -119,11 +119,12 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             model = self.model.train()
             train_epoch_start = dt.datetime.now()
 
-            # Use either scheduled decay or decay at plateau
+            # Decay loss if either parameter is enabled
             if settings['l_rate_decay_epoch']:
                 analysis_utils.exp_lr_scheduler(optimizer, epoch, settings['l_rate_decay'], settings['l_rate_decay_epoch'])
-            elif self.loss_tracker.is_loss_at_plateau(epochs_until_decay=settings['l_rate_decay_patience']) is True:
-                analysis_utils.decay_learning_rate(optimizer, settings['lr_decay'])
+            elif settings['l_rate_decay_patience']:
+                if self.loss_tracker.is_loss_at_plateau(epochs_until_decay=settings['l_rate_decay_patience']) is True:
+                    analysis_utils.decay_learning_rate(optimizer, settings['lr_decay'])
 
             for i, batch in enumerate(self.train_loader):
                 images, labels = analysis_utils.imgs_labels_to_variables(batch[0], batch[1])
