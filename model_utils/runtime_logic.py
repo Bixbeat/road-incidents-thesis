@@ -244,7 +244,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
                 self.model = self.model.cuda()
 
             if settings['visualiser'] == 'tensorboard':
-                self.writer.add_image('Image',  cam_tensor, epoch_now)
+                self.writer.add_image(f'{settings.cam_layer}_{img_class}',  cam_tensor, epoch_now)
             elif settings['visualiser'] == 'visdom':                            
                 # Function keeps plotting panes, phased out for now.
                 target_class = self.classes[img_class]
