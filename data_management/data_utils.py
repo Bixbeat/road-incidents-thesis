@@ -43,12 +43,14 @@ class ImgDatabaseHandler():
         except sqlite3.IntegrityError as e:
             print(f'Cannot load records: {e}')
     
-    def calculate_splits(self, table, field_name, split_probabilities):
+    def calculate_splits(self, table, field_name, split_probabilities, commit_interval=50):
         records = self.get_all_records(table)
-        for record in records:
+        for i, record in enumerate(records):
             split = determine_split(split_probabilities)
             try:
                 self.db.execute(f'UPDATE {table} SET {field_name}=(?) WHERE img_id=(?)', [split, record[0]])
+                if i % commit_interval == 0 or i == len(records):
+                    self.db.commit()
             except sqlite3.IntegrityError as e:
                 print(f'Cannot load records: {e}')
                 
@@ -56,6 +58,7 @@ class ImgDatabaseHandler():
         try:
             self.db.execute(f'ALTER TABLE {table} ADD COLUMN {field_name} INTEGER;')
         except sqlite3.IntegrityError as e:
+            self.db.rollback()
             print(f'Cannot add split field: {e}')
 
 def determine_split(split_probs):
