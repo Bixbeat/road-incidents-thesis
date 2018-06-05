@@ -139,7 +139,7 @@ def del_image_if_equal(img_path_1, img_path_2):
 
 def image_to_dataloader_folders(dataloader_root, img_class, img_split, img_path, output_img_width='original', equal_aspect=False):
     img_name = os.path.basename(img_path)
-    target_img_path = os.path.join(dataloader_root, img_split, img_class, img_name)
+    target_img_path = os.path.join(dataloader_root, img_split, str(img_class), img_name)
     if output_img_width != 'original':
         try:
             img_to_resize = Image.open(img_path)
