@@ -231,7 +231,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             target_img = images[0].unsqueeze(0)
             cam_input_img = analysis_utils.var_to_cpu(target_img)
 
-            if next(self.model.parameters()).is_cuda:
+            if next(self.model.parameters()).is_cuda: #Most compact way to check if model is in cuda
                 self.model = self.model.cpu()
                 used_cuda = True
             
@@ -244,9 +244,9 @@ class AnnotatedImageAnalysis(ImageAnalysis):
                 self.model = self.model.cuda()
 
             if settings['visualiser'] == 'tensorboard':
-                self.writer.add_image(f'{settings.cam_layer}_{img_class}',  cam_tensor, epoch_now)
+                self.writer.add_image(f'{settings["cam_layer"]}_{img_class}',  cam_tensor, epoch_now)
             elif settings['visualiser'] == 'visdom':                            
-                # Function keeps plotting panes, phased out for now.
+                # Function keeps plotting panes without overwriting previous, phased out for now.
                 target_class = self.classes[img_class]
                 # Can't figure out a way to use the ndarray, instead we convert to PIL again
                 # self.vis_data.update_img_window(self.cam_window, cam_float_tensor,
