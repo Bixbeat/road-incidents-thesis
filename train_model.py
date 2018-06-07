@@ -9,6 +9,7 @@ from copy import deepcopy
 
 from data_management import image_manipulations as i_manips
 from model_utils import runtime_logic
+from model_utils import model_components
 
 if __name__ == "__main__":
     # Fix conda slow loading https://github.com/pytorch/pytorch/issues/537
@@ -48,7 +49,7 @@ if __name__ == "__main__":
 # =============================================================================
     model = models.resnet18(pretrained=True)
     num_ftrs = model.fc.in_features
-    model.fc = nn.Linear(num_ftrs, num_classes)    
+    model.fc = nn.Linear(num_ftrs, num_classes)
 
     if torch.cuda.is_available():
         model = model.cuda()
@@ -65,15 +66,19 @@ if __name__ == "__main__":
     sdevs = norm_params['sdevs']
 
     train_transforms = transforms.Compose([
-                        transforms.RandomResizedCrop(224),
+                        transforms.Resize(224),
+                        transforms.RandomCrop(224),
                         transforms.RandomHorizontalFlip(),
+                        transforms.RandomGrayscale(),
+                        transforms.RandomRotation(15),
+                        transforms.ColorJitter(0.05, 0.05, 0.05, 0.05),
                         transforms.ToTensor(),
                         transforms.Normalize(means, sdevs)
                     ])
 
     val_transforms =  transforms.Compose([
-                        transforms.Resize(256),
-                        transforms.CenterCrop(224),
+                        transforms.Resize(224),
+                        transforms.RandomCrop(224),
                         transforms.ToTensor(),
                         transforms.Normalize([means[0], means[1], means[2]], [sdevs[0], sdevs[1], sdevs[2]])
                     ])
