@@ -1,6 +1,7 @@
 import string
 import random
 import os
+import shutil
 
 import sqlite3
 
@@ -98,3 +99,14 @@ def create_dataloader_folders(root_dir, data_folder_name, classes):
             class_folder = os.path.join(split_folder, c)
             create_dir_if_not_exist(class_folder)
 
+def randomly_sample_from_folder(folder_in, folder_out, retain_every_n, seed=1):
+    random.seed(seed)
+    files_in_root = next(os.walk(dir))[2]
+    random.shuffle(files_in_root)
+
+    create_dir_if_not_exist(folder_out)
+    for i, image in enumerate(files_in_root):
+        if (i+1) % retain_every_n == 0:
+            in_img_path = os.path.join(folder_in, image)
+            out_img_path = os.path.join(folder_out, image)
+            shutil.copy(in_img_path, out_img_path)
