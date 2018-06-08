@@ -42,16 +42,20 @@ class ImageAnalysis(object):
 
     def initialize_visdom_visualisation(self):
         self.vis_data = visualise.VisdomVisualiser()
+        self.loss_windows = {}
+        self.timeboxes = {}
         
-        if self.train_loader != None:
-            self.train_loss_window = self.vis_data.vis_plot_loss('train')
-            self.train_timebox = self.vis_data.vis_create_timetracker(self.start_time)
+        if self.train_loader:
+            self.loss_windows['train'] = self.vis_data.vis_plot_loss('train')
+            self.timeboxes['train'] = self.vis_data.vis_create_timetracker(self.start_time)
 
-        if self.val_loader != None:
-            self.val_loss_window = self.vis_data.vis_plot_loss('val')
-            self.val_timebox = self.vis_data.vis_create_timetracker(self.start_time)
-            self.combined_loss_window = self.vis_data.vis_plot_loss("combined")
+        if self.val_loader:
+            self.loss_windows['val'] = self.vis_data.vis_plot_loss('val')
+            self.timeboxes['val'] = self.vis_data.vis_create_timetracker(self.start_time)
             self.cam_window = self.vis_data.vis_img_window('cam_val')
+        
+        if self.train_loader and self.val_loader:
+            self.loss_windows['combined'] = self.vis_data.vis_plot_loss("combined")
 
     def update_loss_values(self, all_recorded_loss, loss_plot_window):
         self.vis_data.custom_update_loss_plot(loss_plot_window, all_recorded_loss, title="<b>Training loss</b>", color='#0000ff')
@@ -88,6 +92,12 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             loss.backward()
             optimizer.step()
         return(loss.data[0], preds)
+
+    def store_results(self, settings):
+        pass
+
+    def visualise_results(self):
+        pass
 
     def train(self, settings):
         """Performs model training
@@ -153,10 +163,10 @@ class AnnotatedImageAnalysis(ImageAnalysis):
 
             # Visualizing
             if settings['visualiser'] == 'visdom':
-                self.vis_data.custom_update_loss_plot(self.train_loss_window, self.all_train_loss, title="<b>Train loss</b>", color="#0000ff")
-                self.update_vis_timer("<b>Training</b>", train_epoch_start, total_train_batches, self.train_timebox)                
+                self.vis_data.custom_update_loss_plot(self.loss_windows['train'], self.all_train_loss, title="<b>Train loss</b>", color="#0000ff")
+                self.update_vis_timer("<b>Training</b>", train_epoch_start, total_train_batches, self.timeboxes['train'])                
                 if self.val_loader is not None:
-                    self.vis_data.custom_combined_loss_plot(self.combined_loss_window, self.loss_tracker.all_loss['train'], self.loss_tracker.all_loss['val'])
+                    self.vis_data.custom_combined_loss_plot(self.loss_windows['combined'], self.loss_tracker.all_loss['train'], self.loss_tracker.all_loss['val'])
 
             elif settings['visualiser'] == 'tensorboard':
                 self.writer.add_scalar('Train/Loss', avg_epoch_train_loss, epoch_now)
@@ -210,8 +220,8 @@ class AnnotatedImageAnalysis(ImageAnalysis):
 
         # Visualizing
         if settings['visualiser'] == 'visdom':
-            self.update_vis_timer("<b>Validation</b>", val_epoch_start, total_val_batches,self.val_timebox)
-            self.vis_data.custom_update_loss_plot(self.val_loss_window, self.loss_tracker.all_loss['val'], title="<b>Validation loss</b>")
+            self.update_vis_timer("<b>Validation</b>", val_epoch_start, total_val_batches,self.timeboxes['val'])
+            self.vis_data.custom_update_loss_plot(self.loss_windows['val'], self.loss_tracker.all_loss['val'], title="<b>Validation loss</b>")
             
         elif settings['visualiser'] == 'tensorboard':
             self.writer.add_scalar('Val/Loss', avg_epoch_val_loss, epoch_now)
