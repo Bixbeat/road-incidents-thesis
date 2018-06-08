@@ -112,7 +112,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
                 self.vis_data.custom_combined_loss_plot(self.loss_windows['combined'], self.loss_tracker.all_loss['train'], self.loss_tracker.all_loss['val'])
 
         elif settings['visualiser'] == 'tensorboard':
-            self.writer.add_scalar(f'{split}/Loss', self.loss_tracker.all_loss[split], epoch)
+            self.writer.add_scalar(f'{split}/Loss', self.loss_tracker.all_loss[split][-1], epoch)
             self.writer.add_scalar(f'{split}/Accuracy', epoch_accuracy, epoch)
 
     def add_cam_img(self, target_img, img_class, cam_layer, epoch):
