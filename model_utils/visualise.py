@@ -284,7 +284,7 @@ def create_camgrad_img(model, img_class, target_img, means, sdevs, camgrad_layer
     cam_img = cam_extractor.generate_cam(cam_input_img, means, sdevs, target_class = img_class)
 
     if used_cuda:
-        self.model = self.model.cuda()    
+        self.model = model.cuda()    
     return cam_img
 
 if __name__ == '__main__':
