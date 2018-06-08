@@ -221,7 +221,8 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             img_class_tensor = analysis_utils.var_to_cpu(labels[0].data)
             img_class = int(img_class_tensor.numpy())
             target_img = images[0].unsqueeze(0)
-            cam_img = visualise.create_camgrad_img(eval_model, img_class, target_img, self.means, self.sdevs, settings['cam_layer'])
+            gradcam = visualise.GradCam(eval_model, settings['cam_layer'])
+            cam_img = gradcam.create_gradcam_img(img_class, target_img, self.means, self.sdevs)
 
             to_tensor = ToTensor()
             cam_tensor = to_tensor(cam_img)

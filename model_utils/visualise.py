@@ -219,6 +219,7 @@ class GradCam():
     """
     def __init__(self, model, target_layer):
         self.model = model.eval()
+        self.target_layer = target_layer
         self.extractor = CamExtractor(self.model, target_layer)       
 
     def generate_cam(self, input_image, means, sdevs, out_img_size=224, cam_transparency=0.5, unnormalize=True, target_class=None):
@@ -258,6 +259,20 @@ class GradCam():
         cam_resized = ImageOps.fit(cam_img, (out_img_size, out_img_size))
         return cam_resized
 
+    def create_gradcam_img(self, img_class, target_img, means, sdevs):
+        cam_input_img = var_to_cpu(target_img)
+        used_cuda = None
+        if next(self.model.parameters()).is_cuda: #Most compact way to check if model is in cuda
+            self.model = self.model.cpu()
+            used_cuda = True
+        
+        cam_extractor = GradCam(self.model, self.target_layer)
+        cam_img = cam_extractor.generate_cam(cam_input_img, means, sdevs, target_class = img_class)
+
+        if used_cuda:
+            self.model = self.model.cuda()
+        return cam_img        
+
 def colourize_gradient(img_array):
     colour = mpl.cm.get_cmap('rainbow')
     coloured_img = colour(img_array)
@@ -272,20 +287,6 @@ def normalized_img_tensor_to_pil(img_tensor, means, sdevs):
     )
     inverse_tensor = inverse_normalize(img_tensor)      
     return to_pil(inverse_tensor)
-
-def create_camgrad_img(model, img_class, target_img, means, sdevs, camgrad_layer):
-    cam_input_img = var_to_cpu(target_img)
-    used_cuda = None
-    if next(model.parameters()).is_cuda: #Most compact way to check if model is in cuda
-        self.model = self.model.cpu()
-        used_cuda = True
-    
-    cam_extractor = GradCam(model, camgrad_layer)
-    cam_img = cam_extractor.generate_cam(cam_input_img, means, sdevs, target_class = img_class)
-
-    if used_cuda:
-        self.model = model.cuda()    
-    return cam_img
 
 if __name__ == '__main__':
     visualize_loss = Visualiser()
