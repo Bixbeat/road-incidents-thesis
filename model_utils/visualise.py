@@ -273,6 +273,20 @@ def normalized_img_tensor_to_pil(img_tensor, means, sdevs):
     inverse_tensor = inverse_normalize(img_tensor)      
     return to_pil(inverse_tensor)
 
+def create_camgrad_img(model, img_class, target_img, means, sdevs, camgrad_layer):
+    cam_input_img = var_to_cpu(target_img)
+    used_cuda = None
+    if next(model.parameters()).is_cuda: #Most compact way to check if model is in cuda
+        self.model = self.model.cpu()
+        used_cuda = True
+    
+    cam_extractor = GradCam(model, camgrad_layer)
+    cam_img = cam_extractor.generate_cam(cam_input_img, means, sdevs, target_class = img_class)
+
+    if used_cuda:
+        self.model = self.model.cuda()    
+    return cam_img
+
 if __name__ == '__main__':
     visualize_loss = Visualiser()
     

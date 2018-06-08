@@ -30,8 +30,15 @@ class ImageAnalysis(object):
         self.sdevs = sdevs
         self.classes = classes
 
-        ## Timing
+        # Timekeeping
         self.start_time = dt.datetime.now()
+            
+        # Tracking loss
+        self.all_train_loss = np.array([])
+        self.all_val_loss = np.array([])          
+        
+        self.loss_tracker = analysis_utils.LossRecorder()
+        self.writer = None
 
     def initialize_visdom_visualisation(self):
         self.vis_data = visualise.VisdomVisualiser()
@@ -55,6 +62,11 @@ class ImageAnalysis(object):
         epoch_spd = epoch_time/(total_n_samples)
         self.vis_data.update_timer(header,timebox,epoch_start,epoch_time,epoch_spd)
 
+    def save_if_best(self, avg_epoch_val_loss, model, out_name):
+        if len(self.loss_tracker.all_loss['val']) > 0 and self.loss_tracker.store_models is True:
+            if avg_epoch_val_loss > max(self.loss_tracker.all_loss['val']):
+                self.loss_tracker.save_model(model, out_name)    
+
 class AnnotatedImageAnalysis(ImageAnalysis):
     """Performs semantic segmentation
     TODO: refactor repeated code (e.g. timekeeping)"""
@@ -65,16 +77,6 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         self.val_loader = val_loader
         self.means = means
         self.sdevs = sdevs
-        
-        # Timekeeping
-        self.start_time = dt.datetime.now()
-            
-        # Tracking loss
-        self.all_train_loss = np.array([])
-        self.all_val_loss = np.array([])          
-        
-        self.loss_tracker = analysis_utils.LossRecorder()
-        self.writer = None
 
     def get_batch_loss_and_preds(self, images, labels, model, criterion, optimizer=None):
         if optimizer:
@@ -134,18 +136,13 @@ class AnnotatedImageAnalysis(ImageAnalysis):
                 analysis_utils.add_accuracy(train_batch_accuracies, preds, labels, len(preds))
 
                 if (i+1) % settings['report_interval']['train'] == 0:
+                    # TODO: Print images & label
                     print(f"Train {epoch+1}: [{i} of {len(self.train_loader)}] : {epoch_train_loss/(i+1):.4f}")
-                    # TODO
-                    # img, pred = visualise.encoded_img_and_lbl_to_data(image, pred, self.means, self.sdevs)
-                    # visualise.plot_pairs(img, pred)
 
             total_train_batches = len(self.train_loader)
             epoch_train_accuracy = np.mean(train_batch_accuracies)
-
-            # Store loss & accuracy
             avg_epoch_train_loss = epoch_train_loss/(i+1)
-            self.loss_tracker.save_loss_if_enabled(self.loss_tracker.loss_files['train'], avg_epoch_train_loss, epoch_now)
-            self.loss_tracker.all_loss['train'] = np.append(self.loss_tracker.all_loss['train'], avg_epoch_train_loss)
+            self.loss_tracker.store_epoch_loss('train', epoch_now, avg_epoch_train_loss, epoch_train_accuracy)
 
             # Validate model at every epoch if val loader is present           
             if self.val_loader is not None:
@@ -160,6 +157,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
                 self.update_vis_timer("<b>Training</b>", train_epoch_start, total_train_batches, self.train_timebox)                
                 if self.val_loader is not None:
                     self.vis_data.custom_combined_loss_plot(self.combined_loss_window, self.loss_tracker.all_loss['train'], self.loss_tracker.all_loss['val'])
+
             elif settings['visualiser'] == 'tensorboard':
                 self.writer.add_scalar('Train/Loss', avg_epoch_train_loss, epoch_now)
                 self.writer.add_scalar('Train/Accuracy', epoch_train_accuracy, epoch_now)
@@ -206,14 +204,9 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         # Store loss & accuracy
         avg_epoch_val_loss = epoch_val_loss/(i+1)
         epoch_val_accuracy = np.mean(val_batch_accuracies)
-        self.loss_tracker.save_loss_if_enabled(self.loss_tracker.loss_files['val'], avg_epoch_val_loss, epoch_now)
-        self.loss_tracker.all_loss['val'] = np.append(self.loss_tracker.all_loss['val'], avg_epoch_val_loss)
-        self.loss_tracker.accuracy['val'] = np.append(self.loss_tracker.accuracy['val'], epoch_val_accuracy)
+        self.loss_tracker.store_epoch_loss('val', epoch_now, avg_epoch_val_loss, epoch_val_accuracy)
 
-        # Save model if best accuracy
-        if len(self.loss_tracker.all_loss['val']) > 0 and self.loss_tracker.store_models is True:
-            if avg_epoch_val_loss > max(self.loss_tracker.all_loss['val']):
-                self.loss_tracker.save_model(eval_model, 'best')
+        self.save_if_best(avg_epoch_val_loss, eval_model, settings['run_name']+'_best')
 
         # Visualizing
         if settings['visualiser'] == 'visdom':
@@ -224,34 +217,16 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             self.writer.add_scalar('Val/Loss', avg_epoch_val_loss, epoch_now)
             self.writer.add_scalar('Val/Accuracy', epoch_val_accuracy, epoch_now)
 
-        if settings['cam_layer'] != None:
-            used_cuda = None
+        if settings['cam_layer'] != None and settings['visualiser'] == 'tensorboard':
             img_class_tensor = analysis_utils.var_to_cpu(labels[0].data)
             img_class = int(img_class_tensor.numpy())
             target_img = images[0].unsqueeze(0)
-            cam_input_img = analysis_utils.var_to_cpu(target_img)
+            cam_img = visualise.create_camgrad_img(eval_model, img_class, target_img, self.means, self.sdevs, settings['cam_layer'])
 
-            if next(self.model.parameters()).is_cuda: #Most compact way to check if model is in cuda
-                self.model = self.model.cpu()
-                used_cuda = True
-            
-            cam_extractor = visualise.GradCam(self.model, settings['cam_layer'])
-            cam_img = cam_extractor.generate_cam(cam_input_img, self.means, self.sdevs, target_class = img_class)
             to_tensor = ToTensor()
             cam_tensor = to_tensor(cam_img)
 
-            if used_cuda:
-                self.model = self.model.cuda()
-
-            if settings['visualiser'] == 'tensorboard':
-                self.writer.add_image(f'{settings["cam_layer"]}_{img_class}',  cam_tensor, epoch_now)
-            elif settings['visualiser'] == 'visdom':                            
-                # Function keeps plotting panes without overwriting previous, phased out for now.
-                target_class = self.classes[img_class]
-                # Can't figure out a way to use the ndarray, instead we convert to PIL again
-                # self.vis_data.update_img_window(self.cam_window, cam_float_tensor,
-                #                                 f"CAM for layer {settings['cam_layer']}",
-                #                                 f"CAM for class {target_class}")                    
+            self.writer.add_image(f'{settings["cam_layer"]}_{img_class}',  cam_tensor, epoch_now)      
 
         print(f"Val accuracy: {epoch_val_accuracy:.4f}")
         print(f"Val final loss: {avg_epoch_val_loss}")

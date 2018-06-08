@@ -22,14 +22,18 @@ class LossRecorder():
         
     def setup_output_storage(self, run_name, store_models=True, store_loss=True):
         self.run_name = run_name
-        
         if store_loss is True:
             self.store_loss = True
             data_utils.create_dir_if_not_exist(os.path.join(self.output_dir, 'loss'))        
         if store_models is True:
             self.store_models = True
             data_utils.create_dir_if_not_exist(os.path.join(self.output_dir, 'models'))
-    
+
+    def store_epoch_loss(self, split, epoch, avg_epoch_loss, epoch_accuracy):
+        self.save_loss_if_enabled(self.loss_files[split], avg_epoch_loss, epoch)
+        self.all_loss[split] = np.append(self.all_loss[split], avg_epoch_loss)
+        self.accuracy[split] = np.append(self.accuracy[split], epoch_accuracy)
+
     def set_loss_file(self, split):
         data_utils.create_dir_if_not_exist(f'{self.output_dir}/loss/{self.run_name}')
         self.loss_files[split] = f'{self.output_dir}/loss/{self.run_name}/{split}.csv' 
@@ -61,7 +65,6 @@ def var_to_cpu(var):
     if var.is_cuda:
         var = var.cpu()
     return var
-            
 
 def fix_state_dict(state_dict):
     """README: This is a cheap hack to fix model saving in PyTorch with the Densenet implementation.
