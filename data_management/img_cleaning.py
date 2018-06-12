@@ -29,7 +29,8 @@ class ImageCleaner():
         self.db_handler.create_img_table(self.target_table)
         if skip_to_folder_name is not None:
             all_folders = [x[0] for x in walk(data_root)]
-            folders_after_index = self.skip_to_folder(all_folders, skip_to_folder_name)
+            full_skip_folder = path.join(data_root,skip_to_folder_name)
+            folders_after_index = self.skip_to_folder(all_folders, full_skip_folder)
         print(f'''Determine whether image is of class {target_class}: 
                 1 or empty is true, 0 is false, q to quit, sp to save previous, rp to remove previous, index to skip to an index''')
         for root, _, files in walk(data_root):
@@ -37,7 +38,7 @@ class ImageCleaner():
                 if not root in folders_after_index:
                     continue
             print(f"\n\n\n\n\nNow in folder {root}\n\n\n\n\n")
-            time.sleep(3) # Too easy to miss otherwise
+            time.sleep(0.5) # Too easy to miss otherwise
             while self.current_index < len(files):
                 if self.current_index < 0 or self.current_index > len(files):
                     self._set_index()
