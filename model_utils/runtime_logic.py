@@ -122,6 +122,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         loss_2 = 0
         accuracies_1 = []
         accuracies_2 = {}
+
         fc1_negatives = settings['negatives_class']
         for i, batch in enumerate(self.train_loader):
             model.fc1.requires_grad = True
@@ -168,7 +169,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
                 loss_2.backward()
                 settings['optimizer'][1].step()
         
-        return [loss_1, loss_2], [accuracies_1, accuracies_2]
+        return [loss_1, loss_2]
 
     def visualise_loss(self, settings, epoch, epoch_start, epoch_accuracy, total_n_batches, split):
         if settings['visualiser'] == 'visdom':
@@ -244,19 +245,10 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             model = self.model.train()
             self.decay_lr_if_enabled(settings['optimizer'], epoch, settings)
 
-            epoch_train_loss, epoch_train_accuracy = self.run_multitask_model(model, settings, optimize=True)
+            epoch_train_loss = self.run_multitask_model(model, settings, optimize=True)
 
-            total_train_batches = len(self.train_loader)
-            self.loss_tracker.store_epoch_loss('train', epoch_now, epoch_train_loss, epoch_train_accuracy)
-        
-            if self.val_loader is not None:
-                self.validate(settings)
-
-            if epoch_now % settings['save_interval'] == 0 and self.loss_tracker.store_models is True:
-                self.loss_tracker.save_model(model, epoch)
-
-            self.visualise_loss(settings, epoch_now, train_epoch_start, epoch_train_accuracy, total_train_batches, 'train')
-            self.print_results(epoch_now, epoch_train_loss, epoch_train_accuracy)
+            print(epoch_train_loss[0])
+            print(epoch_train_loss[1])
 
         if settings['shutdown'] is True:
             os.system("shutdown")            
