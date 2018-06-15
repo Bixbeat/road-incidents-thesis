@@ -1,5 +1,6 @@
 from model_utils import visualise
 from model_utils import analysis_utils
+from model_utils.analysis_utils import var_to_cpu, var_to_cuda
 
 import os
 from os import path
@@ -88,18 +89,13 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         self.means = means
         self.sdevs = sdevs
 
-    def get_batch_loss(self, images, labels, model, criterion):
-        outputs = model(images)
-        loss = criterion(outputs, labels)      
-        return loss
-
     def get_batch_loss_and_preds(self, images, labels, model, criterion):
         outputs = model(images)
         _, preds = torch.max(outputs, 1)
         loss = criterion(outputs, labels)
         return loss, preds
 
-    def run_classifier_on_batches(self, model, settings, split, optimize=False):
+    def run_singletask_model(self, model, settings, split, optimize=False):
         loss = 0
         accuracies = []                
         for i, batch in enumerate(self.train_loader):
@@ -111,12 +107,68 @@ class AnnotatedImageAnalysis(ImageAnalysis):
                 batch_loss.backward()
                 settings['optimizer'].step()
             loss += batch_loss.data[0]
-            analysis_utils.add_accuracy(accuracies, preds, labels, len(preds))
+            analysis_utils.add_accuracy(accuracies, preds, labels)
             if (i+1) % settings['report_interval']['train'] == 0:
-                print(f"{split}: [{i} of {len(self.train_loader)}] : {loss/(i+1):.4f}")
+                print(f"{split}: [{i} : {loss/(i+1):.4f}")
         loss = loss/(i+1)
         accuracies = np.mean(accuracies)
         return loss, accuracies
+
+    def run_multitask_model(self, model, settings, optimize=False):
+        """Esoteric method to train multitask model with 2 FCLs and n classes in second FCL
+        # Possibly relevant for FCL2: https://discuss.pytorch.org/t/indexing-multi-dimensional-tensors-based-on-1d-tensor-of-indices/1391
+        """
+        loss_1 = 0
+        loss_2 = 0
+        accuracies_1 = []
+        accuracies_2 = {}
+        fc1_negatives = settings['negatives_class']
+        for i, batch in enumerate(self.train_loader):
+            model.fc1.requires_grad = True
+            model.fc2.requires_grad = False            
+            if optimize:
+                settings['optimizer'][0].zero_grad()
+                settings['optimizer'][1].zero_grad()
+
+            images, labels = analysis_utils.imgs_labels_to_variables(batch[0], batch[1])
+            outputs = model(images)
+            outputs[0] = var_to_cpu(outputs[0])
+            outputs[1] = var_to_cpu(outputs[1])
+
+            ## Output 1 - 1 binary classifier
+            _, preds = torch.max(outputs[0], 1)
+            fc1_labels_binary = (labels != fc1_negatives).long()
+            loss_1 += settings['criterion'][fc1_negatives](outputs[0], fc1_labels_binary)
+            analysis_utils.add_accuracy(accuracies_1, preds, labels)
+
+            if optimize:
+                loss_1.backward()
+                settings['optimizer'][0].step()
+                model.fc1.requires_grad = False
+                model.fc2.requires_grad = True
+            
+            # Second classifier runs
+            if torch.max(labels.data) > 0:
+                matching_labels = torch.masked_select(labels, fc1_labels_binary.byte())
+                positive_indices = ((fc1_labels_binary == 1).nonzero())
+                fcl2_outputs = torch.Tensor(1, 2) # TODO: FIX hardcoding
+                for i, val in enumerate(positive_indices):
+                    index = outputs[1].index_select(0, val)
+                    fcl2_outputs = torch.cat((fcl2_outputs, index.data), 0)
+                fcl2_outputs = var_to_cuda(Variable(fcl2_outputs[1:])) # Remove the random values used to initialize
+
+                for i, classifier in enumerate(settings['criterion']):
+                    if i != fc1_negatives:
+                        class_labels_binary = var_to_cuda((matching_labels == i).long())
+                        loss_2 += ((classifier(fcl2_outputs, class_labels_binary)) * settings['class_weights'][i])
+            # analysis_utils.add_accuracy(accuracies_2, preds, class_labels_binary)
+
+            if optimize:
+                loss_2 = var_to_cuda(Variable(loss_2.data, requires_grad=True))
+                loss_2.backward()
+                settings['optimizer'][1].step()
+        
+        return [loss_1, loss_2], [accuracies_1, accuracies_2]
 
     def visualise_loss(self, settings, epoch, epoch_start, epoch_accuracy, total_n_batches, split):
         if settings['visualiser'] == 'visdom':
@@ -160,7 +212,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             model = self.model.train()
             self.decay_lr_if_enabled(settings['optimizer'], epoch, settings)
 
-            epoch_train_loss, epoch_train_accuracy = self.run_classifier_on_batches(model, settings, 'train', optimize=True)
+            epoch_train_loss, epoch_train_accuracy = self.run_singletask_model(model, settings, 'train', optimize=True)
 
             total_train_batches = len(self.train_loader)
             self.loss_tracker.store_epoch_loss('train', epoch_now, epoch_train_loss, epoch_train_accuracy)
@@ -177,6 +229,38 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         if settings['shutdown'] is True:
             os.system("shutdown")
 
+
+    def train_multitask(self, settings):
+        """Esoteric method for multitask training"""
+
+        if self.loss_tracker.store_loss is True:
+            self.loss_tracker.set_loss_file('train')
+        if settings['visualiser'] is not None:
+            self.instantiate_visualizer(settings['visualiser'])
+
+        for epoch in range(settings['n_epochs']):
+            train_epoch_start = dt.datetime.now()
+            epoch_now = epoch+1
+            model = self.model.train()
+            self.decay_lr_if_enabled(settings['optimizer'], epoch, settings)
+
+            epoch_train_loss, epoch_train_accuracy = self.run_multitask_model(model, settings, optimize=True)
+
+            total_train_batches = len(self.train_loader)
+            self.loss_tracker.store_epoch_loss('train', epoch_now, epoch_train_loss, epoch_train_accuracy)
+        
+            if self.val_loader is not None:
+                self.validate(settings)
+
+            if epoch_now % settings['save_interval'] == 0 and self.loss_tracker.store_models is True:
+                self.loss_tracker.save_model(model, epoch)
+
+            self.visualise_loss(settings, epoch_now, train_epoch_start, epoch_train_accuracy, total_train_batches, 'train')
+            self.print_results(epoch_now, epoch_train_loss, epoch_train_accuracy)
+
+        if settings['shutdown'] is True:
+            os.system("shutdown")            
+
     def validate(self, settings):
         """For a given model, evaluation criterion,
         and validation loader, performs a single evaluation
@@ -190,7 +274,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         if self.loss_tracker.store_loss is True:
             self.loss_tracker.set_loss_file('val')
 
-        epoch_val_loss, epoch_val_accuracy = self.run_classifier_on_batches(eval_model, settings, 'val', optimize=False)
+        epoch_val_loss, epoch_val_accuracy = self.run_singletask_model(eval_model, settings, 'val', optimize=False)
 
         epoch_now = len(self.loss_tracker.all_loss['val'])+1
         total_val_batches = len(self.val_loader)

@@ -66,6 +66,11 @@ def var_to_cpu(var):
         var = var.cpu()
     return var
 
+def var_to_cuda(var):
+    if torch.cuda.is_available():
+        var = var.cuda()
+    return var
+
 def fix_state_dict(state_dict):
     """README: This is a cheap hack to fix model saving in PyTorch with the Densenet implementation.
     After updating to PyTorch 0.3 model saving was done with explicit 'module.-' prefixes
@@ -97,7 +102,8 @@ def decay_learning_rate(optimizer, lr_decay):
         param_group['lr'] *= lr_decay
     return optimizer
 
-def add_accuracy(accuracy_list, preds, labels, batch_length):
+def add_accuracy(accuracy_list, preds, labels):
+    batch_length = len(preds)
     total_correct_in_batch = int(torch.sum(preds == labels))
     correct_ratio_in_batch = float(total_correct_in_batch/batch_length)
     accuracy_list.append(correct_ratio_in_batch)
@@ -127,3 +133,7 @@ def write_loss(file, run_name, loss, epoch=0):
             
     with open(file, 'a') as f:
         f.write("{},{},{}\n".format(run_name, loss, epoch))
+
+def get_relative_class_weights(entries_per_class):
+    total_n = sum(entries_per_class)
+    return [v/total_n for v in entries_per_class]
