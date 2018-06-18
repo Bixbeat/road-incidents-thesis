@@ -133,12 +133,13 @@ class AnnotatedImageAnalysis(ImageAnalysis):
 
             images, labels = analysis_utils.imgs_labels_to_variables(batch[0], batch[1])
             outputs = model(images)
-            outputs[0] = var_to_cpu(outputs[0])
-            outputs[1] = var_to_cpu(outputs[1])
+            # outputs[0] = var_to_cpu(outputs[0])
+            # outputs[1] = var_to_cpu(outputs[1])
 
             ## Output 1 - 1 binary classifier
             _, preds = torch.max(outputs[0], 1)
             fc1_labels_binary = (labels != fc1_negatives).long()
+            settings['criterion'][fc1_negatives] = settings['criterion'][fc1_negatives]
             loss_1 += settings['criterion'][fc1_negatives](outputs[0], fc1_labels_binary)
             analysis_utils.add_accuracy(accuracies_1, preds, labels)
 
@@ -152,11 +153,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             if torch.max(labels.data) > 0:
                 matching_labels = torch.masked_select(labels, fc1_labels_binary.byte())
                 positive_indices = ((fc1_labels_binary == 1).nonzero())
-                fcl2_outputs = torch.Tensor(1, 2) # TODO: FIX hardcoding
-                for i, val in enumerate(positive_indices):
-                    index = outputs[1].index_select(0, val)
-                    fcl2_outputs = torch.cat((fcl2_outputs, index.data), 0)
-                fcl2_outputs = var_to_cuda(Variable(fcl2_outputs[1:])) # Remove the random values used to initialize
+                fcl2_outputs = outputs[1][positive_indices, :].squeeze(1)
 
                 for i, classifier in enumerate(settings['criterion']):
                     if i != fc1_negatives:
@@ -165,7 +162,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             # analysis_utils.add_accuracy(accuracies_2, preds, class_labels_binary)
 
             if optimize:
-                loss_2 = var_to_cuda(Variable(loss_2.data, requires_grad=True))
+                loss_2 = var_to_cuda(Variable(loss_2, requires_grad=True))
                 loss_2.backward()
                 settings['optimizer'][1].step()
         
