@@ -5,6 +5,8 @@ import shutil
 
 import sqlite3
 
+from data_management.image_manipulations import is_image
+
 class ImgDatabaseHandler():
     """NOTE: Don't use this code in production without cleaning the input on the table name!"""
     def __init__(self, db_root):
@@ -89,6 +91,7 @@ def generate_random_filename(length=10):
     return("".join(random.choice(allchar) for x in range(length)))
 
 def create_dataloader_folders(root_dir, data_folder_name, classes):
+    """For a given root dir, creates a folder structure which matches the PyTorch dataloader format"""
     data_root = os.path.join(root_dir, data_folder_name)
     create_dir_if_not_exist(data_root)
     splits = ['train', 'val', 'test']
@@ -100,13 +103,32 @@ def create_dataloader_folders(root_dir, data_folder_name, classes):
             create_dir_if_not_exist(class_folder)
 
 def randomly_sample_from_folder(folder_in, folder_out, retain_every_n, seed=1):
+    """For a given folder, shuffles the folder and retains every nth image"""
     random.seed(seed)
-    files_in_root = next(os.walk(dir))[2]
+    files_in_root = next(os.walk(folder_in))[2]
     random.shuffle(files_in_root)
-
     create_dir_if_not_exist(folder_out)
+    n_imgs = 0
     for i, image in enumerate(files_in_root):
-        if (i+1) % retain_every_n == 0:
-            in_img_path = os.path.join(folder_in, image)
-            out_img_path = os.path.join(folder_out, image)
-            shutil.copy(in_img_path, out_img_path)
+        if (n_imgs+1) % retain_every_n == 0:
+            if is_image(image):
+                in_img_path = os.path.join(folder_in, image)
+                out_img_path = os.path.join(folder_out, image)
+                shutil.copy(in_img_path, out_img_path)
+                n_imgs += 1
+
+def save_n_images_from_dir(dir_in, target_dir, retain_n_total, seed=1):
+    create_dir_if_not_exist(target_dir)
+    random.seed(seed)
+    images = []
+    for root, _, files in os.walk(dir_in):
+        images += [os.path.join(root, file) for file in files if is_image(file)]
+    random.shuffle(images)
+    selected_imgs = random.sample(images,retain_n_total)
+    for i, image in enumerate(selected_imgs):
+        img_name = os.path.basename(image)
+        out_path = os.path.join(target_dir, img_name)
+        shutil.copy(image, out_path)
+        if i % 1000 == 0:
+            print(i)
+
