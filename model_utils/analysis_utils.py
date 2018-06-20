@@ -134,6 +134,22 @@ def write_loss(file, run_name, loss, epoch=0):
     with open(file, 'a') as f:
         f.write("{},{},{}\n".format(run_name, loss, epoch))
 
-def get_relative_class_weights(entries_per_class):
-    total_n = sum(entries_per_class)
-    return [v/total_n for v in entries_per_class]
+def get_relative_class_weights(dir_in, inverse_weights=True):
+    entries_per_class = {}
+    for root, _, files in os.walk(dir_in):
+        if files:
+            class_name = os.path.split(root)[1]
+            if not class_name in entries_per_class.keys():
+                entries_per_class[class_name] = len(files)
+            else:
+                entries_per_class[class_name] += len(files)
+    # PyTorch classes are loaded alphabetically, so we return the dict indexwise
+    indexwise_counts = [count for key, count in entries_per_class.items()]
+    total_n_images = sum(indexwise_counts)
+    if inverse_weights:
+        class_weights = [1-(n_images/total_n_images) for n_images in indexwise_counts]
+    else:
+        class_weights = [n_images/total_n_images for n_images in indexwise_counts]
+    return class_weights
+
+
