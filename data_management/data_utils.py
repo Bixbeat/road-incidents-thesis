@@ -117,18 +117,16 @@ def randomly_sample_from_folder(folder_in, folder_out, retain_every_n, seed=1):
                 shutil.copy(in_img_path, out_img_path)
                 n_imgs += 1
 
-def save_n_images_from_dir(dir_in, target_dir, retain_n_total, seed=1):
+def sample_n_images_from_dir(dir_in, target_dir, retain_n_total, seed=1):
     create_dir_if_not_exist(target_dir)
     random.seed(seed)
     images = []
     for root, _, files in os.walk(dir_in):
         images += [os.path.join(root, file) for file in files if is_image(file)]
     random.shuffle(images)
+    if retain_n_total > len(images):
+        retain_n_total = len(images)
+        print(f'Not enough images in the set, retaining all ({retain_n_total})')
     selected_imgs = random.sample(images,retain_n_total)
-    for i, image in enumerate(selected_imgs):
-        img_name = os.path.basename(image)
-        out_path = os.path.join(target_dir, img_name)
-        shutil.copy(image, out_path)
-        if i % 1000 == 0:
-            print(i)
+    return selected_imgs
 
