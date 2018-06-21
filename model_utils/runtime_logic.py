@@ -226,7 +226,9 @@ class AnnotatedImageAnalysis(ImageAnalysis):
 
         if settings['shutdown'] is True:
             os.system("shutdown")
-
+        
+        print(f"Train accuracy {epoch_now}: {epoch_train_accuracy:.4f}")
+        print(f"Train {epoch_now} final loss: {epoch_train_loss}")
 
     def train_multitask(self, settings):
         """Esoteric method for multitask training"""
