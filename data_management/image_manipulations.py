@@ -6,7 +6,6 @@ Sources:
 """
 import os, os.path
 import numpy as np
-import scipy.misc as misc
 import shutil
 
 from PIL import Image, ImageOps
@@ -17,9 +16,15 @@ def get_normalize_params(all_image_filepaths, num_bands):
     TODO: Expand beyond 3 bands"""
     band_mean = [[] for i in range(num_bands)]
     band_stdev = [[] for i in range(num_bands)]
+
     for i, file in enumerate(all_image_filepaths):
-        current_img = misc.imread(file)
-        
+        current_img = Image.open(file)
+        if num_bands == 3 and current_img.mode == 'L':
+            bw_image = current_img
+            current_img = Image.new("RGB", current_img.size)
+            current_img.paste(bw_image)              
+        current_img = np.asarray(current_img)
+    
         for band in range(num_bands):
             band_mean[band].append(np.mean(current_img[:,:,band]))
             band_stdev[band].append(np.std(current_img[:,:,band]))
