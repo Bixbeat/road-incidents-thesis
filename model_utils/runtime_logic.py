@@ -109,7 +109,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             loss += batch_loss.data[0]
             analysis_utils.add_accuracy(accuracies, preds, labels)
             if (i+1) % settings['report_interval']['train'] == 0:
-                print(f"{split}: [{i} : {loss/(i+1):.4f}")
+                print(f"{split}: [{i} out of {len(self.train_loader)} : {loss/(i+1):.4f}")
         loss = loss/(i+1)
         accuracies = np.mean(accuracies)
         return loss, accuracies
@@ -185,9 +185,9 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             if self.loss_tracker.is_loss_at_plateau(epochs_until_decay=settings['l_rate_decay_patience']) is True:
                 analysis_utils.decay_learning_rate(optimizer, settings['lr_decay'])
 
-    def print_results(self, epoch, loss, accuracy):
-        print(f"Train accuracy {epoch}: {accuracy:.4f}")
-        print(f"Train {epoch} final loss: {loss:.4f}")        
+    def print_results(self, epoch, loss, accuracy, split):
+        print(f"{split} {epoch} accuracy: {accuracy:.4f}")
+        print(f"{split} {epoch} final loss: {loss:.4f}")        
 
     def add_cam_img(self, target_img, img_class, cam_layer, epoch):
         gradcam = visualise.GradCam(self.model, cam_layer)
@@ -222,13 +222,10 @@ class AnnotatedImageAnalysis(ImageAnalysis):
                 self.loss_tracker.save_model(model, epoch)
 
             self.visualise_loss(settings, epoch_now, train_epoch_start, epoch_train_accuracy, total_train_batches, 'train')
-            self.print_results(epoch_now, epoch_train_loss, epoch_train_accuracy)
+            self.print_results(epoch_now, epoch_train_loss, epoch_train_accuracy, 'train')
 
         if settings['shutdown'] is True:
             os.system("shutdown")
-        
-        print(f"Train accuracy {epoch_now}: {epoch_train_accuracy:.4f}")
-        print(f"Train {epoch_now} final loss: {epoch_train_loss}")
 
     def train_multitask(self, settings):
         """Esoteric method for multitask training"""
@@ -279,6 +276,6 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             target_img = Variable(images[0].unsqueeze(0))
             self.add_cam_img(target_img, target_class, settings['cam_layer'], epoch_now)
         
-        self.print_results(epoch_now, epoch_val_loss, epoch_val_accuracy)
+        self.print_results(epoch_now, epoch_val_loss, epoch_val_accuracy, 'val')
 
     
