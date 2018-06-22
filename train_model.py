@@ -10,6 +10,7 @@ from copy import deepcopy
 from data_management import image_manipulations as i_manips
 from model_utils import runtime_logic
 from model_utils import model_components
+from model_utils.analysis_utils import get_relative_class_weights
 
 if __name__ == "__main__":
     # Fix conda slow loading https://github.com/pytorch/pytorch/issues/537
@@ -22,6 +23,7 @@ if __name__ == "__main__":
 
     run_name = "ResNet-test"
     data_dir = 'hymenoptera_data'
+    #data_dir = '/media/alex/A4A034E0A034BB1E/incidents-thesis/test-final/incidents_cleaned'
 
     n_epochs = 100
     workers = 4
@@ -34,14 +36,17 @@ if __name__ == "__main__":
     
     batch_size = 5
     num_channels = 3
-    num_classes = 8
+    num_classes = 4
     
-    criterion = nn.CrossEntropyLoss()
+    class_weights = torch.Tensor(get_relative_class_weights(data_dir))
+    if torch.cuda.is_available():
+        class_weights = class_weights.cuda()
+    criterion = nn.CrossEntropyLoss(class_weights)
     
     shutdown_after = False
     report_results_per_n_batches = {'train':1, 'val':5}
     save_interval = 9999
-    visualiser = 'visdom' # Visdom for local, Tensorboard for Colaboratory.
+    visualiser = 'tensorboard' # Visdom for local, Tensorboard for Colaboratory.
     cam_layer = 'conv1'
 
 # =============================================================================
@@ -52,8 +57,8 @@ if __name__ == "__main__":
     model.fc = nn.Linear(num_ftrs, num_classes)
 
     if torch.cuda.is_available():
-        model = model.cuda()
         criterion = criterion.cuda()
+        model = model.cuda()
     
     optimizer = optim.Adam(model.parameters(), lr=init_l_rate, weight_decay=w_decay)
 # =============================================================================
