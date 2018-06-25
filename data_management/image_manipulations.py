@@ -13,13 +13,13 @@ from PIL import Image, ImageOps
 def get_normalize_params(all_image_filepaths, num_bands):
     """For a set of image filepaths, returns the mean
     and stdev of all bands of all images in the set
-    TODO: Expand beyond 3 bands"""
+    """
     band_mean = [[] for i in range(num_bands)]
     band_stdev = [[] for i in range(num_bands)]
 
     for i, file in enumerate(all_image_filepaths):
         current_img = Image.open(file)
-        if num_bands == 3 and current_img.mode == 'L':
+        if num_bands == 3 and current_img.mode in ['L', 'P']: #Stopgap for B&W images
             bw_image = current_img
             current_img = Image.new("RGB", current_img.size)
             current_img.paste(bw_image)              
@@ -32,7 +32,7 @@ def get_normalize_params(all_image_filepaths, num_bands):
     for i,_ in enumerate(band_mean):
         band_mean[i] = np.mean(band_mean[i])
         band_stdev[i] = np.mean(band_stdev[i])
-        
+
     return {'means': band_mean, 'sdevs':band_stdev}
 
 def get_images(root_filepath, sort=True):
@@ -53,7 +53,7 @@ def keep_mixed_class_labels(img_paths, lbl_paths):
     corrected_lbl_paths = []
 
     for i, label in enumerate(lbl_paths):
-        lbl = np.array(Image.open(label))
+        lbl = np.asarray(Image.open(label))
         if np.max(lbl) != np.min(lbl):
             corrected_img_paths.append(img_paths[i])
             corrected_lbl_paths.append(lbl_paths[i])
@@ -142,18 +142,17 @@ def del_image_if_equal(img_path_1, img_path_2):
     img_2.close()
     return(remove_path)
 
-def image_to_dataloader_folders(dataloader_root, img_class, img_split, img_path, output_img_width='original', equal_aspect=False):
+def image_to_dataloader_folders(dataloader_root, img_class, img_split, img_path, output_img_width='original', crop_bottom=0):
     img_name = os.path.basename(img_path)
     target_img_path = os.path.join(dataloader_root, img_split, str(img_class), img_name)
     if output_img_width != 'original':
         try:
             img_to_resize = Image.open(img_path)
-            resized_img = img_to_thumbnail(img_to_resize, output_img_width)
-            if equal_aspect:
-                img_to_equal_resize = ImageOps.fit(resized_img, (output_img_width, output_img_width))
-                img_to_equal_resize.save(target_img_path)
-            else:
-                resized_img.save(target_img_path)
+            # TODO: Make this function less convoluted
+            if crop_bottom > 0:
+                img_to_resize = crop_bottom_and_sides(img_to_resize, crop_bottom)
+            img_to_equal_resize = ImageOps.fit(img_to_resize, (output_img_width, output_img_width))
+            img_to_equal_resize.save(target_img_path)
         except FileNotFoundError as e:
             print(f'file not found: {e}\n')        
     else:
@@ -161,3 +160,17 @@ def image_to_dataloader_folders(dataloader_root, img_class, img_split, img_path,
             shutil.copyfile(img_path, target_img_path)
         except shutil.Error as e:
             print(f'Cannot copy file: {e}\n')
+
+def crop_bottom_and_sides(pil_img, bottom_ratio):
+    """Esoteric method to deal with the ego vehicle being in the bottom 
+    of many frames in the BDD dataset. Crops out the full ratio from the
+    bottom and half from the left & right to maintain an equal aspect ratio"""
+    array_to_resize = np.asarray(pil_img)
+    height, width, _ = np.shape(array_to_resize)
+    new_height = int(height*(1-bottom_ratio))-1 # Offset index
+    width_slice = int(width*(bottom_ratio/2)) # Slice half of left & right
+    cropped_array = array_to_resize[:new_height, width_slice:(width-width_slice),:,]
+    return Image.fromarray(cropped_array)
+
+        # bottom_cropped_img = img_to_resize[;,;,;,]
+        # img_to_equal_resize = ImageOps.fit(resized_img, (output_img_width, output_img_width))
