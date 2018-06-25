@@ -19,6 +19,7 @@ class LossRecorder():
         self.loss_files = {'train':'', 'val':''}
         self.all_loss = {'train':np.array([]), 'val':np.array([])}
         self.accuracy = {'train':np.array([]), 'val':np.array([])}
+        self.conf_matrix = {'train':None, 'val':None}
         
     def setup_output_storage(self, run_name, store_models=True, store_loss=True):
         self.run_name = run_name
@@ -108,6 +109,23 @@ def add_accuracy(accuracy_list, preds, labels):
     correct_ratio_in_batch = float(total_correct_in_batch/batch_length)
     accuracy_list.append(correct_ratio_in_batch)
     return(accuracy_list)  
+
+class ConfusionMatrix():
+    def __init__(self, n_classes):
+        self.n_classes = n_classes
+        self.matrix = np.ndarray([n_classes, n_classes], dtype='uint16')
+        self.matrix.fill(0)
+    
+    def update(self, label, predicted):
+        self.matrix[:,label][predicted] += 1
+
+    def get_labelled_matrix(self):
+        class_array = np.ndarray([self.n_classes,1], dtype='uint16')
+        class_array[:,0] = np.arange(self.n_classes)
+        out_matrix = np.hstack((class_array, self.matrix))
+        return out_matrix
+
+
 
 def weights_init(m):
     """For all convolutional layers in a model,
