@@ -2,13 +2,19 @@ import string
 import random
 import os
 import shutil
+import operator
+import csv
 
 import sqlite3
 
 from data_management.image_manipulations import is_image
 
 class ImgDatabaseHandler():
-    """NOTE: Don't use this code in production without cleaning the input on the table name!"""
+    """IMPORTANT NOTE: Don't use this code in production without cleaning the input on the table name!
+    Sets up a database connection with functions to save images.
+    Args:
+        db_root (string): Path to the database.
+    """
     def __init__(self, db_root):
         self.db = sqlite3.connect(db_root)
         self.cursor = self.db.cursor()
@@ -130,3 +136,32 @@ def sample_n_images_from_dir(dir_in, target_dir, retain_n_total, seed=1):
     selected_imgs = random.sample(images,retain_n_total)
     return selected_imgs
 
+def sample_from_geograph(imgs_with_coords, limits):
+    """Filters entries in a defined bounding box.
+    Uses the structure supplied by the geograph file for lat/lon indices
+    """
+    imgs_in_range = []
+    # if float(image[5]) >= limits['lat'][0] and float(image[5]) < limits['lat'][1]:
+
+def get_coord_splits(imgs_with_coords, split_probs):
+    split_entries = {}
+    lower_limit_multiplier, upper_limit_multiplier = 0, 0 # Running increment for indexing
+    sorted_imgs = sorted(imgs_with_coords, key=operator.itemgetter(5))
+
+    i = 0
+    for split in split_probs:
+        lower_limit = 0
+        split_entries[split] = []
+        upper_limit_multiplier += split_probs[split]
+        upper_limit = int(upper_limit_multiplier * len(imgs_with_coords))
+        while i in range (lower_limit, upper_limit):
+            split_entries[split].append(sorted_imgs[i])
+            i += 1
+        i = upper_limit
+    return split_entries
+
+def get_geograph_coords(geograph_img_filepaths, geograph_metadata_file):
+    """P.S. Yes it was a concious decision not to use Pandas"""
+    with open(geograph_metadata_file, 'r', encoding='utf8', errors='ignore') as meta_file:
+        metadata = csv.reader(meta_file, delimiter=',')
+        return [entry for entry in metadata if entry[-1] in geograph_img_filepaths]
