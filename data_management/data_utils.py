@@ -145,7 +145,7 @@ def sample_from_geograph(imgs_with_coords, limits):
 
 def get_coord_splits(imgs_with_coords, split_probs):
     split_entries = {}
-    lower_limit_multiplier, upper_limit_multiplier = 0, 0 # Running increment for indexing
+    upper_limit_multiplier = 0 # Running increment for indexing
     sorted_imgs = sorted(imgs_with_coords, key=operator.itemgetter(5))
 
     i = 0
@@ -157,7 +157,7 @@ def get_coord_splits(imgs_with_coords, split_probs):
         while i in range (lower_limit, upper_limit):
             split_entries[split].append(sorted_imgs[i])
             i += 1
-        i = upper_limit
+        i = upper_limit # set lower limit
     return split_entries
 
 def get_geograph_coords(geograph_img_filepaths, geograph_metadata_file):
