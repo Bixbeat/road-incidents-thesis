@@ -209,10 +209,10 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         for epoch in range(settings['n_epochs']):
             train_epoch_start = dt.datetime.now()
             epoch_now = epoch+1
-            model = self.model.train()
+            self.model = self.model.train()
             self.decay_lr_if_enabled(settings['optimizer'], epoch, settings)
 
-            epoch_train_loss, epoch_train_accuracy, train_conf_matrix = self.run_singletask_model(model, settings, 'train', optimize=True)
+            epoch_train_loss, epoch_train_accuracy, train_conf_matrix = self.run_singletask_model(self.model, settings, 'train', optimize=True)
 
             total_train_batches = len(self.train_loader)
             self.loss_tracker.store_epoch_loss('train', epoch_now, epoch_train_loss, epoch_train_accuracy)
@@ -222,7 +222,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
                 self.validate(settings)
 
             if epoch_now % settings['save_interval'] == 0 and self.loss_tracker.store_models is True:
-                self.loss_tracker.save_model(model, epoch)
+                self.loss_tracker.save_model(self.model, epoch)
 
             self.visualise_loss(settings, epoch_now, train_epoch_start, epoch_train_accuracy, total_train_batches, 'train')
             self.print_results(epoch_now, epoch_train_loss, epoch_train_accuracy, 'train')
@@ -242,10 +242,10 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         for epoch in range(settings['n_epochs']):
             train_epoch_start = dt.datetime.now()
             epoch_now = epoch+1
-            model = self.model.train()
+            self.model = self.model.train()
             self.decay_lr_if_enabled(settings['optimizer'], epoch, settings)
 
-            epoch_train_loss = self.run_multitask_model(model, settings, optimize=True)
+            epoch_train_loss = self.run_multitask_model(self.model, settings, optimize=True)
 
             print(epoch_train_loss[0])
             print(epoch_train_loss[1])
@@ -257,7 +257,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         """For a given model, evaluation criterion,
         and validation loader, performs a single evaluation
         pass."""
-        eval_model = self.model.eval()
+        self.model = self.model.eval()
         val_epoch_start = dt.datetime.now()
 
         epoch_val_loss = 0
@@ -266,12 +266,12 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         if self.loss_tracker.store_loss is True:
             self.loss_tracker.set_loss_file('val')
 
-        epoch_val_loss, epoch_val_accuracy, val_conf_matrix = self.run_singletask_model(eval_model, settings, 'val', optimize=False)
+        epoch_val_loss, epoch_val_accuracy, val_conf_matrix = self.run_singletask_model(self.model, settings, 'val', optimize=False)
 
         epoch_now = len(self.loss_tracker.all_loss['val'])+1
         total_val_batches = len(self.val_loader)
         self.loss_tracker.store_epoch_loss('val', epoch_now, epoch_val_loss, epoch_val_accuracy)
-        self.save_if_best(epoch_val_loss, eval_model, settings['run_name']+'_best')
+        self.save_if_best(epoch_val_loss, self.model, settings['run_name']+'_best')
         self.loss_tracker.conf_matrix['val'] = val_conf_matrix
 
         self.visualise_loss(settings, epoch_now, val_epoch_start, epoch_val_accuracy, total_val_batches, 'val')
