@@ -259,7 +259,7 @@ class GradCam():
         cam_resized = ImageOps.fit(cam_img, (out_img_size, out_img_size))
         return cam_resized
 
-    def create_gradcam_img(self, img_class, target_img, means, sdevs):
+    def create_gradcam_img(self, img_class, target_img, means, sdevs, input_size):
         cam_input_img = var_to_cpu(target_img)
         used_cuda = None
         if next(self.model.parameters()).is_cuda: #Most compact way to check if model is in cuda
@@ -267,7 +267,7 @@ class GradCam():
             used_cuda = True
         
         cam_extractor = GradCam(self.model, self.target_layer)
-        cam_img = cam_extractor.generate_cam(cam_input_img, means, sdevs, target_class = img_class)
+        cam_img = cam_extractor.generate_cam(cam_input_img, means, sdevs, input_size, target_class=img_class)
 
         if used_cuda:
             self.model = self.model.cuda()

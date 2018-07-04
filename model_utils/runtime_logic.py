@@ -191,9 +191,9 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         print(f"{split} {epoch} accuracy: {accuracy:.4f}")
         print(f"{split} {epoch} final loss: {loss:.4f}")        
 
-    def add_cam_img(self, target_img, img_class, cam_layer, epoch):
+    def add_cam_img(self, target_img, img_class, cam_layer, epoch, input_size):
         gradcam = visualise.GradCam(self.model, cam_layer)
-        cam_img = gradcam.create_gradcam_img(img_class, target_img, self.means, self.sdevs)
+        cam_img = gradcam.create_gradcam_img(img_class, target_img, self.means, self.sdevs, input_size)
         to_tensor = ToTensor()
         cam_tensor = to_tensor(cam_img)
         self.writer.add_image(f'{cam_layer}_{img_class}', cam_tensor, epoch)      
@@ -279,7 +279,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             images, labels = next(iter(self.train_loader))
             target_class = labels[0]
             target_img = Variable(images[0].unsqueeze(0))
-            self.add_cam_img(target_img, target_class, settings['cam_layer'], epoch_now)
+            self.add_cam_img(target_img, target_class, settings['cam_layer'], epoch_now, target_img.shape[-1])
         
         self.print_results(epoch_now, epoch_val_loss, epoch_val_accuracy, 'val')
         print('Validation confusion matrix:\n', val_conf_matrix)
