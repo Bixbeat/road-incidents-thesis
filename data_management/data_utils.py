@@ -153,8 +153,8 @@ def get_coord_splits(imgs_with_coords, split_probs, dim_range, dim_index):
         i = upper_limit+1 # set lower limit
     return split_entries
 
-def get_geograph_coords(geograph_img_filepaths, geograph_metadata_file):
+def get_geograph_coords(geograph_img_filepaths, geograph_metadata_file, class_index):
     """Retrieves all geograph entries that match the filepath in the metadata file"""
     with open(geograph_metadata_file, 'r', encoding='utf8', errors='ignore') as meta_file:
         metadata = csv.reader(meta_file, delimiter=',')
-        return [entry for entry in metadata if entry[-1] in geograph_img_filepaths]
+        return [entry for entry in metadata if entry[class_index] in geograph_img_filepaths]
