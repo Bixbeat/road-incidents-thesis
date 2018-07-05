@@ -90,8 +90,8 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         self.sdevs = sdevs
         self.classes = classes
 
-    def get_batch_loss_and_preds(self, images, labels, model, criterion):
-        outputs = model(images)
+    def get_batch_loss_and_preds(self, images, labels, criterion):
+        outputs = self.model(images)
         _, preds = torch.max(outputs, 1)
         loss = criterion(outputs, labels)
         return loss, preds
@@ -105,9 +105,10 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             if optimize:
                 settings['optimizer'].zero_grad()
             images, labels = analysis_utils.imgs_labels_to_variables(batch[0], batch[1])
-            batch_loss, preds = self.get_batch_loss_and_preds(images, labels, self.model, settings['criterion'])
+            batch_loss, preds = self.get_batch_loss_and_preds(images, labels, settings['criterion'])
             [conf_matrix.update(int(var_to_cpu(labels[i])), int(var_to_cpu(preds[i]))) for i in range(len(labels))]
             if optimize:
+                batch_loss.backward()
                 settings['optimizer'].step()
             loss += batch_loss.data[0]
             analysis_utils.add_accuracy(accuracies, preds, labels)
