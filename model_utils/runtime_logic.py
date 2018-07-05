@@ -96,22 +96,23 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         loss = criterion(outputs, labels)
         return loss, preds
 
-    def run_singletask_model(self, model, settings, split, optimize=False):
+    def run_singletask_model(self, settings, split, loader, optimize=False):
+        """TODO: Make loader dependent on split"""
         loss = 0
         accuracies = []
         conf_matrix = analysis_utils.ConfusionMatrix(len(self.classes))
-        for i, batch in enumerate(self.train_loader):
+        for i, batch in enumerate(loader):
             if optimize:
                 settings['optimizer'].zero_grad()
             images, labels = analysis_utils.imgs_labels_to_variables(batch[0], batch[1])
-            batch_loss, preds = self.get_batch_loss_and_preds(images, labels, model, settings['criterion'])
+            batch_loss, preds = self.get_batch_loss_and_preds(images, labels, self.model, settings['criterion'])
             [conf_matrix.update(int(var_to_cpu(labels[i])), int(var_to_cpu(preds[i]))) for i in range(len(labels))]
             if optimize:
                 settings['optimizer'].step()
             loss += batch_loss.data[0]
             analysis_utils.add_accuracy(accuracies, preds, labels)
-            if (i+1) % settings['report_interval']['train'] == 0:
-                print(f"{split}: [{i} out of {len(self.train_loader)} : {loss/(i+1):.4f}")
+            if (i+1) % settings['report_interval'][split] == 0:
+                print(f"{split}: [{i} out of {len(loader)}] : {loss/(i+1):.4f}")
         loss = loss/(i+1)
         accuracies = np.mean(accuracies)
         return loss, accuracies, conf_matrix.matrix
@@ -212,7 +213,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             self.model = self.model.train()
             self.decay_lr_if_enabled(settings['optimizer'], epoch, settings)
 
-            epoch_train_loss, epoch_train_accuracy, train_conf_matrix = self.run_singletask_model(self.model, settings, 'train', optimize=True)
+            epoch_train_loss, epoch_train_accuracy, train_conf_matrix = self.run_singletask_model(settings, 'train', self.train_loader, optimize=True)
 
             total_train_batches = len(self.train_loader)
             self.loss_tracker.store_epoch_loss('train', epoch_now, epoch_train_loss, epoch_train_accuracy)
@@ -266,7 +267,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         if self.loss_tracker.store_loss is True:
             self.loss_tracker.set_loss_file('val')
 
-        epoch_val_loss, epoch_val_accuracy, val_conf_matrix = self.run_singletask_model(self.model, settings, 'val', optimize=False)
+        epoch_val_loss, epoch_val_accuracy, val_conf_matrix = self.run_singletask_model(settings, 'val', self.val_loader, optimize=False)
 
         epoch_now = len(self.loss_tracker.all_loss['val'])+1
         total_val_batches = len(self.val_loader)
