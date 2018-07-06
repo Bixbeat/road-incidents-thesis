@@ -164,10 +164,10 @@ def get_relative_class_weights(dir_in, inverse_weights=True):
     # PyTorch classes are loaded alphabetically, so we return the dict indexwise
     indexwise_counts = [count for key, count in entries_per_class.items()]
     total_n_images = sum(indexwise_counts)
-    if inverse_weights:
-        class_weights = [1-(n_images/total_n_images) for n_images in indexwise_counts]
-    else:
-        class_weights = [n_images/total_n_images for n_images in indexwise_counts]
+    for key, count in entries_per_class.items():
+        if inverse_weights:
+            entries_per_class[key] = 1-(count/total_n_images)
+        else:
+            entries_per_class[key] = count/total_n_images
+    class_weights = [count for key, count in sorted(entries_per_class.items())]
     return class_weights
-
-
