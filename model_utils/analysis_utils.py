@@ -45,10 +45,18 @@ class LossRecorder():
             
     def is_loss_at_plateau(self, epochs_until_decay):
         if len(self.all_loss['train']) >= epochs_until_decay:
-            return(self.all_loss['train'][-1] > np.mean(self.all_loss['train'][-epochs_until_decay:-2]))
+            lowest_loss = min(self.all_loss['train'])
+            current_loss = self.all_loss['train'][-1]
+            is_lowest_loss = current_loss > lowest_loss
+            
+            best_loss_epoch = self.all_loss['train'].index(lowest_loss)+1
+            epochs_since_best = len(self.all_loss['train']) - best_loss_epoch
+            epoch_patience_expired = epochs_since_best >= epochs_until_decay
+
+            return is_lowest_loss and epoch_patience_expired
 
     def save_model(self, model, prefix):
-        torch.save(model.state_dict(), f'outputs/models/{prefix}_{self.run_name}.pkl')            
+        torch.save(model.state_dict(), f'outputs/models/{prefix}_{self.run_name}.pkl')  
 
 def imgs_labels_to_variables(images, labels):
     if torch.cuda.is_available():
@@ -136,7 +144,7 @@ def weights_init(m):
 
 def get_predictions(output_batch):
     """For a given input batch, retrieves the most likely class (argmax along channel)
-    [SRC]"""
+    """
     bs,c,h,w = output_batch.size()
     tensor = output_batch.data
     # Argmax along channel axis (softmax probabilities)
