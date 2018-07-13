@@ -183,7 +183,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             analysis_utils.exp_lr_scheduler(optimizer, epoch, settings['l_rate_decay'], settings['l_rate_decay_epoch'])
         elif settings['l_rate_decay_patience']:
             if self.loss_tracker.is_loss_at_plateau(epochs_until_decay=settings['l_rate_decay_patience']) is True:
-                analysis_utils.decay_learning_rate(optimizer, settings['lr_decay'])
+                analysis_utils.decay_learning_rate(optimizer, settings['l_rate_decay'])
 
     def print_results(self, epoch, loss, accuracy, split):
         print(f"{split} {epoch} accuracy: {accuracy:.4f}")
