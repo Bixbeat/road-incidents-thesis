@@ -32,11 +32,7 @@ class ImageAnalysis(object):
         self.classes = classes
 
         # Timekeeping
-        self.start_time = dt.datetime.now()
-            
-        # Tracking loss
-        self.all_train_loss = np.array([])
-        self.all_val_loss = np.array([])          
+        self.start_time = dt.datetime.now()      
         
         self.loss_tracker = analysis_utils.LossRecorder()
         self.writer = None
@@ -198,16 +194,14 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         cam_img = gradcam.create_gradcam_img(img_class, target_img, self.means, self.sdevs, input_size)
         to_tensor = ToTensor()
         cam_tensor = to_tensor(cam_img)
-        self.writer.add_image(f'{cam_layer}_{img_class}', cam_tensor, epoch)      
+        self.writer.add_image(f'{cam_layer}_trueclass_{img_class}', cam_tensor, epoch)   
 
     def train(self, settings):
         """Performs model training"""
-
         if self.loss_tracker.store_loss is True:
             self.loss_tracker.set_loss_file('train')
         if settings['visualiser'] is not None:
             self.instantiate_visualizer(settings['visualiser'])
-
         for epoch in range(settings['n_epochs']):
             train_epoch_start = dt.datetime.now()
             epoch_now = epoch+1
