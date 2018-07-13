@@ -182,8 +182,10 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         if settings['l_rate_decay_epoch']:
             analysis_utils.exp_lr_scheduler(optimizer, epoch, settings['l_rate_decay'], settings['l_rate_decay_epoch'])
         elif settings['l_rate_decay_patience']:
-            if self.loss_tracker.is_loss_at_plateau(epochs_until_decay=settings['l_rate_decay_patience']) is True:
-                analysis_utils.decay_learning_rate(optimizer, settings['l_rate_decay'])
+            if self.loss_tracker.is_loss_at_plateau(epochs_until_decay=settings['l_rate_decay_patience']):
+                print(f"Loss at plateau, decaying learning rate by {settings['l_rate_decay']}")
+                optimizer = analysis_utils.decay_learning_rate(optimizer, settings['l_rate_decay'])
+        return optimizer
 
     def print_results(self, epoch, loss, accuracy, split):
         print(f"{split} {epoch} accuracy: {accuracy:.4f}")
@@ -206,7 +208,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             train_epoch_start = dt.datetime.now()
             epoch_now = epoch+1
             self.model = self.model.train()
-            self.decay_lr_if_enabled(settings['optimizer'], epoch, settings)
+            settings['optimizer'] = self.decay_lr_if_enabled(settings['optimizer'], epoch, settings)
 
             epoch_train_loss, epoch_train_accuracy, train_conf_matrix = self.run_singletask_model(settings, 'train', self.train_loader, optimize=True)
 
