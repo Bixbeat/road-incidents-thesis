@@ -48,8 +48,8 @@ class LossRecorder():
             lowest_loss = min(self.all_loss['train'])
             current_loss = self.all_loss['train'][-1]
             is_lowest_loss = current_loss > lowest_loss
-            
-            best_loss_epoch = self.all_loss['train'].index(lowest_loss)+1
+             
+            best_loss_epoch = int(np.where(self.all_loss['train']==lowest_loss)[-1])
             epochs_since_best = len(self.all_loss['train']) - best_loss_epoch
             epoch_patience_expired = epochs_since_best >= epochs_until_decay
 
