@@ -274,7 +274,7 @@ class GradCam():
         return cam_img        
 
 def colourize_gradient(img_array):
-    colour = mpl.cm.get_cmap('rainbow')
+    colour = mpl.cm.get_cmap('RdYlBu')
     coloured_img = colour(img_array)
     return coloured_img
 
