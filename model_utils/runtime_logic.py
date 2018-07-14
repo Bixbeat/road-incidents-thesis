@@ -64,7 +64,7 @@ class ImageAnalysis(object):
 
     def save_if_best(self, avg_epoch_val_loss, model, out_name):
         if len(self.loss_tracker.all_loss['val']) > 0 and self.loss_tracker.store_models is True:
-            if avg_epoch_val_loss > max(self.loss_tracker.all_loss['val']):
+            if avg_epoch_val_loss == min(self.loss_tracker.all_loss['val']):
                 self.loss_tracker.save_model(model, out_name)
 
     def instantiate_visualizer(self, visualiser):
@@ -73,8 +73,8 @@ class ImageAnalysis(object):
         elif visualiser == 'tensorboard':
             self.writer = SummaryWriter('/tmp/log')
     
-    def instantiate_loss_tracker(self):
-        self.loss_tracker = analysis_utils.LossRecorder()
+    def instantiate_loss_tracker(self, output_dir='outputs/'):
+        self.loss_tracker = analysis_utils.LossRecorder(output_dir)
 
 class AnnotatedImageAnalysis(ImageAnalysis):
     """Performs semantic segmentation
