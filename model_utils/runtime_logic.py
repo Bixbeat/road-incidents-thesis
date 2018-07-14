@@ -142,11 +142,12 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             self.loss_tracker.set_loss_file('train')
         if settings['visualiser'] is not None:
             self.instantiate_visualizer(settings['visualiser'])
-        if settings['lr_decay_patience'] in settings.keys():
+        if 'lr_decay_patience' in settings:
             lr_scheduler = ReduceLROnPlateau(settings['optimizer'],
                                              'min',
                                              factor=settings['lr_decay'],
-                                             patience=settings['lr_decay_patience'])
+                                             patience=settings['lr_decay_patience'],
+                                             verbose=True)
 
         for epoch in range(settings['n_epochs']):
             train_epoch_start = dt.datetime.now()
@@ -169,7 +170,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             self.print_results(epoch_now, epoch_train_loss, epoch_train_accuracy, 'train')
             print('Training confusion matrix:\n', train_conf_matrix)
 
-            if settings['lr_decay_patience'] in settings.keys():
+            if 'lr_decay_patience' in settings:
                 lr_scheduler.step(epoch_train_loss)
 
         if settings['shutdown'] is True:
