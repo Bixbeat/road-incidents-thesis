@@ -98,19 +98,6 @@ def write_normalize_values(norm_params, output_file_path):
     norm_path = open(output_file_path, 'wb')
     pickle.dump(norm_params, norm_path)
 
-def exp_lr_scheduler(optimizer, epoch, lr_decay=0.1, lr_decay_epoch=7):
-    """Decay learning rate by a factor of lr_decay every lr_decay_epoch epochs
-    https://discuss.pytorch.org/t/adaptive-learning-rate/320/25"""
-    if epoch in lr_decay_epoch:
-        return(optimizer)
-    else:
-        return(decay_learning_rate(optimizer, lr_decay))
-
-def decay_learning_rate(optimizer, lr_decay):
-    for param_group in optimizer.param_groups:
-        param_group['lr'] *= lr_decay
-    return optimizer
-
 def add_accuracy(accuracy_list, preds, labels):
     batch_length = len(preds)
     total_correct_in_batch = int(torch.sum(preds == labels))
@@ -132,8 +119,6 @@ class ConfusionMatrix():
         class_array[:,0] = np.arange(self.n_classes)
         out_matrix = np.hstack((class_array, self.matrix))
         return out_matrix
-
-
 
 def weights_init(m):
     """For all convolutional layers in a model,

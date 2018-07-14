@@ -10,7 +10,7 @@ import datetime as dt
 import scipy.misc as misc
 import torch
 import torch.nn as nn
-from torch.optim import SGD, Adam, RMSprop
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torchvision.transforms import Compose, Normalize, ToTensor
 from torch.autograd import Variable
 from tensorboardX import SummaryWriter
@@ -95,7 +95,6 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         return loss, preds
 
     def run_singletask_model(self, settings, split, loader, optimize=False):
-        """TODO: Make loader dependent on split"""
         loss = 0
         accuracies = []
         conf_matrix = analysis_utils.ConfusionMatrix(len(self.classes))
@@ -116,60 +115,6 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         accuracies = np.mean(accuracies)
         return loss, accuracies, conf_matrix.matrix
 
-    def run_multitask_model(self, model, settings, optimize=False):
-        """Esoteric method to train multitask model with 2 FCLs and n classes in second FCL
-        # Possibly relevant for FCL2: https://discuss.pytorch.org/t/indexing-multi-dimensional-tensors-based-on-1d-tensor-of-indices/1391
-        """
-        loss_1 = 0
-        loss_2 = 0
-        accuracies_1 = []
-        accuracies_2 = {}
-
-        fc1_negatives = settings['negatives_class']
-        for i, batch in enumerate(self.train_loader):
-            model.fc1.requires_grad = True
-            model.fc2.requires_grad = False            
-            if optimize:
-                settings['optimizer'][0].zero_grad()
-                settings['optimizer'][1].zero_grad()
-
-            images, labels = analysis_utils.imgs_labels_to_variables(batch[0], batch[1])
-            outputs = model(images)
-            # outputs[0] = var_to_cpu(outputs[0])
-            # outputs[1] = var_to_cpu(outputs[1])
-
-            ## Output 1 - 1 binary classifier
-            _, preds = torch.max(outputs[0], 1)
-            fc1_labels_binary = (labels != fc1_negatives).long()
-            settings['criterion'][fc1_negatives] = settings['criterion'][fc1_negatives]
-            loss_1 += settings['criterion'][fc1_negatives](outputs[0], fc1_labels_binary)
-            analysis_utils.add_accuracy(accuracies_1, preds, labels)
-
-            if optimize:
-                loss_1.backward()
-                settings['optimizer'][0].step()
-                model.fc1.requires_grad = False
-                model.fc2.requires_grad = True
-            
-            # Second classifier runs
-            if torch.max(labels.data) > 0:
-                matching_labels = torch.masked_select(labels, fc1_labels_binary.byte())
-                positive_indices = ((fc1_labels_binary == 1).nonzero())
-                fcl2_outputs = outputs[1][positive_indices, :].squeeze(1)
-
-                for i, classifier in enumerate(settings['criterion']):
-                    if i != fc1_negatives:
-                        class_labels_binary = var_to_cuda((matching_labels == i).long())
-                        loss_2 += ((classifier(fcl2_outputs, class_labels_binary)) * settings['class_weights'][i])
-            # analysis_utils.add_accuracy(accuracies_2, preds, class_labels_binary)
-
-            if optimize:
-                loss_2 = var_to_cuda(Variable(loss_2, requires_grad=True))
-                loss_2.backward()
-                settings['optimizer'][1].step()
-        
-        return [loss_1, loss_2]
-
     def visualise_loss(self, settings, epoch, epoch_start, epoch_accuracy, total_n_batches, split):
         if settings['visualiser'] == 'visdom':
             self.vis_data.custom_update_loss_plot(self.loss_windows[split], self.loss_tracker.all_loss[split], title=f"<b>{split} loss</b>")
@@ -179,15 +124,6 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         elif settings['visualiser'] == 'tensorboard':
             self.writer.add_scalar(f'{split}/Loss', self.loss_tracker.all_loss[split][-1], epoch)
             self.writer.add_scalar(f'{split}/Accuracy', epoch_accuracy, epoch)
-
-    def decay_lr_if_enabled(self, optimizer, epoch, settings):
-        if settings['l_rate_decay_epoch']:
-            analysis_utils.exp_lr_scheduler(optimizer, epoch, settings['l_rate_decay'], settings['l_rate_decay_epoch'])
-        elif settings['l_rate_decay_patience']:
-            if self.loss_tracker.is_loss_at_plateau(epochs_until_decay=settings['l_rate_decay_patience']):
-                print(f"Loss at plateau, decaying learning rate by {settings['l_rate_decay']}")
-                optimizer = analysis_utils.decay_learning_rate(optimizer, settings['l_rate_decay'])
-        return optimizer
 
     def print_results(self, epoch, loss, accuracy, split):
         print(f"{split} {epoch} accuracy: {accuracy:.4f}")
@@ -206,14 +142,15 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             self.loss_tracker.set_loss_file('train')
         if settings['visualiser'] is not None:
             self.instantiate_visualizer(settings['visualiser'])
+        lr_scheduler = ReduceLROnPlateau(settings['optimizer'], 'min')
+
         for epoch in range(settings['n_epochs']):
             train_epoch_start = dt.datetime.now()
             epoch_now = epoch+1
             self.model = self.model.train()
-            settings['optimizer'] = self.decay_lr_if_enabled(settings['optimizer'], epoch, settings)
 
             epoch_train_loss, epoch_train_accuracy, train_conf_matrix = self.run_singletask_model(settings, 'train', self.train_loader, optimize=True)
-
+            lr_scheduler.step(self.loss_tracker.all_loss['train'])
             total_train_batches = len(self.train_loader)
             self.loss_tracker.store_epoch_loss('train', epoch_now, epoch_train_loss, epoch_train_accuracy)
             self.loss_tracker.conf_matrix['train'] = train_conf_matrix
@@ -222,36 +159,17 @@ class AnnotatedImageAnalysis(ImageAnalysis):
                 self.validate(settings)
 
             if epoch_now % settings['save_interval'] == 0 and self.loss_tracker.store_models is True:
+                print("Checkpoint-saving model")
                 self.loss_tracker.save_model(self.model, epoch)
 
             self.visualise_loss(settings, epoch_now, train_epoch_start, epoch_train_accuracy, total_train_batches, 'train')
             self.print_results(epoch_now, epoch_train_loss, epoch_train_accuracy, 'train')
             print('Training confusion matrix:\n', train_conf_matrix)
 
-        if settings['shutdown'] is True:
-            os.system("shutdown")
-
-    def train_multitask(self, settings):
-        """Esoteric method for multitask training"""
-
-        if self.loss_tracker.store_loss is True:
-            self.loss_tracker.set_loss_file('train')
-        if settings['visualiser'] is not None:
-            self.instantiate_visualizer(settings['visualiser'])
-
-        for epoch in range(settings['n_epochs']):
-            train_epoch_start = dt.datetime.now()
-            epoch_now = epoch+1
-            self.model = self.model.train()
-            self.decay_lr_if_enabled(settings['optimizer'], epoch, settings)
-
-            epoch_train_loss = self.run_multitask_model(self.model, settings, optimize=True)
-
-            print(epoch_train_loss[0])
-            print(epoch_train_loss[1])
+            lr_scheduler.step(self.loss_tracker.all_loss['train'])
 
         if settings['shutdown'] is True:
-            os.system("shutdown")            
+            os.system("shutdown")        
 
     def validate(self, settings):
         """For a given model, evaluation criterion,
@@ -261,7 +179,6 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         val_epoch_start = dt.datetime.now()
 
         epoch_val_loss = 0
-        val_batch_accuracies = []
 
         if self.loss_tracker.store_loss is True:
             self.loss_tracker.set_loss_file('val')
