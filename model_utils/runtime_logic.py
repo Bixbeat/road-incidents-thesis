@@ -94,19 +94,19 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         loss = criterion(outputs, labels)
         return loss, preds
 
-    def run_singletask_model(self, settings, split, loader, optimize=False):
+    def run_singletask_model(self, settings, split, loader, optimizer=False):
         loss = 0
         accuracies = []
         conf_matrix = analysis_utils.ConfusionMatrix(len(self.classes))
         for i, batch in enumerate(loader):
-            if optimize:
-                settings['optimizer'].zero_grad()
+            if optimizer:
+                optimizer.zero_grad()
             images, labels = analysis_utils.imgs_labels_to_variables(batch[0], batch[1])
             batch_loss, preds = self.get_batch_loss_and_preds(images, labels, settings['criterion'])
             [conf_matrix.update(int(var_to_cpu(labels[i])), int(var_to_cpu(preds[i]))) for i in range(len(labels))]
-            if optimize:
+            if optimizer:
                 batch_loss.backward()
-                settings['optimizer'].step()
+                optimizer.step()
             loss += batch_loss.data[0]
             analysis_utils.add_accuracy(accuracies, preds, labels)
             if (i+1) % settings['report_interval'][split] == 0:
@@ -138,12 +138,13 @@ class AnnotatedImageAnalysis(ImageAnalysis):
 
     def train(self, settings):
         """Performs model training"""
+        optimizer = settings['optimizer']
         if self.loss_tracker.store_loss is True:
             self.loss_tracker.set_loss_file('train')
         if settings['visualiser'] is not None:
             self.instantiate_visualizer(settings['visualiser'])
         if 'lr_decay_patience' in settings:
-            lr_scheduler = ReduceLROnPlateau(settings['optimizer'],
+            lr_scheduler = ReduceLROnPlateau(optimizer,
                                              'min',
                                              factor=settings['lr_decay'],
                                              patience=settings['lr_decay_patience'],
@@ -154,7 +155,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             epoch_now = epoch+1
             self.model = self.model.train()
 
-            epoch_train_loss, epoch_train_accuracy, train_conf_matrix = self.run_singletask_model(settings, 'train', self.train_loader, optimize=True)
+            epoch_train_loss, epoch_train_accuracy, train_conf_matrix = self.run_singletask_model(settings, 'train', self.train_loader, optimizer=optimizer)
             self.loss_tracker.store_epoch_loss('train', epoch_now, epoch_train_loss, epoch_train_accuracy)
             self.loss_tracker.conf_matrix['train'] = train_conf_matrix
         
@@ -186,7 +187,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         if self.loss_tracker.store_loss is True:
             self.loss_tracker.set_loss_file('val')
 
-        epoch_val_loss, epoch_val_accuracy, val_conf_matrix = self.run_singletask_model(settings, 'val', self.val_loader, optimize=False)
+        epoch_val_loss, epoch_val_accuracy, val_conf_matrix = self.run_singletask_model(settings, 'val', self.val_loader)
 
         epoch_now = len(self.loss_tracker.all_loss['val'])+1
         self.loss_tracker.store_epoch_loss('val', epoch_now, epoch_val_loss, epoch_val_accuracy)
