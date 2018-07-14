@@ -46,7 +46,7 @@ class LossRecorder():
     def is_loss_at_plateau(self, epochs_until_decay):
         if len(self.all_loss['train']) >= epochs_until_decay:
             lowest_loss = min(self.all_loss['train'])
-            current_loss = self.all_loss['train'][-1]
+            current_loss = self.all_loss['train'][-1] 
             is_lowest_loss = current_loss > lowest_loss
              
             best_loss_epoch = int(np.where(self.all_loss['train']==lowest_loss)[-1])

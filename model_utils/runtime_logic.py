@@ -34,7 +34,6 @@ class ImageAnalysis(object):
         # Timekeeping
         self.start_time = dt.datetime.now()      
         
-        self.loss_tracker = analysis_utils.LossRecorder()
         self.writer = None
 
     def initialize_visdom_visualisation(self):
@@ -73,6 +72,9 @@ class ImageAnalysis(object):
             self.initialize_visdom_visualisation()
         elif visualiser == 'tensorboard':
             self.writer = SummaryWriter('/tmp/log')
+    
+    def instantiate_loss_tracker(self):
+        self.loss_tracker = analysis_utils.LossRecorder()
 
 class AnnotatedImageAnalysis(ImageAnalysis):
     """Performs semantic segmentation
