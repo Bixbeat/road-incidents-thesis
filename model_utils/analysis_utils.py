@@ -55,8 +55,8 @@ class LossRecorder():
 
             return is_lowest_loss and epoch_patience_expired
 
-    def save_model(self, model, prefix):
-        torch.save(model.state_dict(), f'outputs/models/{prefix}_{self.run_name}.pkl')  
+    def save_model(self, model, file_name):
+        torch.save(model.state_dict(), f'outputs/models/{file_name}.pkl')  
 
 def imgs_labels_to_variables(images, labels):
     if torch.cuda.is_available():
