@@ -142,7 +142,11 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             self.loss_tracker.set_loss_file('train')
         if settings['visualiser'] is not None:
             self.instantiate_visualizer(settings['visualiser'])
-        lr_scheduler = ReduceLROnPlateau(settings['optimizer'], 'min')
+        if settings['lr_decay_patience'] in settings.keys():
+            lr_scheduler = ReduceLROnPlateau(settings['optimizer'],
+                                             'min',
+                                             factor=settings['lr_decay'],
+                                             patience=settings['lr_decay_patience'])
 
         for epoch in range(settings['n_epochs']):
             train_epoch_start = dt.datetime.now()
@@ -150,8 +154,6 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             self.model = self.model.train()
 
             epoch_train_loss, epoch_train_accuracy, train_conf_matrix = self.run_singletask_model(settings, 'train', self.train_loader, optimize=True)
-            lr_scheduler.step(self.loss_tracker.all_loss['train'])
-            total_train_batches = len(self.train_loader)
             self.loss_tracker.store_epoch_loss('train', epoch_now, epoch_train_loss, epoch_train_accuracy)
             self.loss_tracker.conf_matrix['train'] = train_conf_matrix
         
@@ -162,11 +164,13 @@ class AnnotatedImageAnalysis(ImageAnalysis):
                 print("Checkpoint-saving model")
                 self.loss_tracker.save_model(self.model, epoch)
 
+            total_train_batches = len(self.train_loader)
             self.visualise_loss(settings, epoch_now, train_epoch_start, epoch_train_accuracy, total_train_batches, 'train')
             self.print_results(epoch_now, epoch_train_loss, epoch_train_accuracy, 'train')
             print('Training confusion matrix:\n', train_conf_matrix)
 
-            lr_scheduler.step(self.loss_tracker.all_loss['train'])
+            if settings['lr_decay_patience'] in settings.keys():
+                lr_scheduler.step(epoch_train_loss)
 
         if settings['shutdown'] is True:
             os.system("shutdown")        
@@ -178,20 +182,19 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         self.model = self.model.eval()
         val_epoch_start = dt.datetime.now()
 
-        epoch_val_loss = 0
-
         if self.loss_tracker.store_loss is True:
             self.loss_tracker.set_loss_file('val')
 
         epoch_val_loss, epoch_val_accuracy, val_conf_matrix = self.run_singletask_model(settings, 'val', self.val_loader, optimize=False)
 
         epoch_now = len(self.loss_tracker.all_loss['val'])+1
-        total_val_batches = len(self.val_loader)
         self.loss_tracker.store_epoch_loss('val', epoch_now, epoch_val_loss, epoch_val_accuracy)
         self.save_if_best(epoch_val_loss, self.model, settings['run_name']+'_best')
         self.loss_tracker.conf_matrix['val'] = val_conf_matrix
 
+        total_val_batches = len(self.val_loader)
         self.visualise_loss(settings, epoch_now, val_epoch_start, epoch_val_accuracy, total_val_batches, 'val')
+        
         if settings['cam_layer'] != None and settings['visualiser'] == 'tensorboard':
             images, labels = next(iter(self.train_loader))
             target_class = labels[0]
