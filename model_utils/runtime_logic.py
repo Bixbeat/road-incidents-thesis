@@ -1,22 +1,17 @@
-from model_utils import visualise
-from model_utils import analysis_utils
-from model_utils.analysis_utils import var_to_cpu, var_to_cuda
-
 import os
-from os import path
-import numpy as np
 import datetime as dt
 
-import scipy.misc as misc
+import numpy as np
 import torch
-import torch.nn as nn
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from torchvision.transforms import Compose, Normalize, ToTensor
+from torchvision.transforms import ToTensor
 from torch.autograd import Variable
 from tensorboardX import SummaryWriter
-from PIL import Image
 
-from data_management import data_utils
+from model_utils import visualise
+from model_utils import analysis_utils
+from model_utils.analysis_utils import var_to_cpu
+
 
 
 class ImageAnalysis(object):
@@ -157,7 +152,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
 
             epoch_train_loss, epoch_train_accuracy, train_conf_matrix = self.run_singletask_model(settings, 'train', self.train_loader, optimizer=optimizer)
             self.loss_tracker.store_epoch_loss('train', epoch_now, epoch_train_loss, epoch_train_accuracy)
-            self.loss_tracker.conf_matrix['train'] = train_conf_matrix
+            self.loss_tracker.conf_matrix['train'].append(train_conf_matrix)
         
             if self.val_loader is not None:
                 self.validate(settings)
@@ -192,7 +187,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         epoch_now = len(self.loss_tracker.all_loss['val'])+1
         self.loss_tracker.store_epoch_loss('val', epoch_now, epoch_val_loss, epoch_val_accuracy)
         self.save_if_best(epoch_val_loss, self.model, settings['run_name']+'_best')
-        self.loss_tracker.conf_matrix['val'] = val_conf_matrix
+        self.loss_tracker.conf_matrix['val'].append(val_conf_matrix)
 
         total_val_batches = len(self.val_loader)
         self.visualise_loss(settings, epoch_now, val_epoch_start, epoch_val_accuracy, total_val_batches, 'val')

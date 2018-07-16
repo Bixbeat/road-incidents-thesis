@@ -19,7 +19,7 @@ class LossRecorder():
         self.loss_files = {'train':'', 'val':''}
         self.all_loss = {'train':np.array([]), 'val':np.array([])}
         self.accuracy = {'train':np.array([]), 'val':np.array([])}
-        self.conf_matrix = {'train':None, 'val':None}
+        self.conf_matrix = {'train':[], 'val':[]}
         
     def setup_output_storage(self, run_name, store_models=True, store_loss=True):
         self.run_name = run_name
