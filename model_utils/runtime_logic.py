@@ -217,7 +217,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         else:
             image = Variable(image)
         output = self.model(image)
-        confidence = softmax(output, dim=1)
+        confidence = torch.max(softmax(output, dim=1))
         _, predicted_class_index = torch.max(output, 1)
         predicted_class = self.classes[int(predicted_class_index)]
         

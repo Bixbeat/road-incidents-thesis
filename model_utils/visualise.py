@@ -264,7 +264,7 @@ class GradCam():
 
     def cam_array_to_heatmap(self, cam_array, out_img_size):
         cam_normalized = (cam_array - np.min(cam_array)) / (np.max(cam_array) - np.min(cam_array))
-        cam_coloured = colourize_gradient(cam_normalized)[:, :, :3]
+        cam_coloured = self.colourize_gradient(cam_normalized)[:, :, :3]
         cam_img = Image.fromarray(np.uint8(cam_coloured*255))
         cam_resized = ImageOps.fit(cam_img, (out_img_size, out_img_size))
         return cam_resized
