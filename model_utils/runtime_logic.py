@@ -6,6 +6,7 @@ import torch
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torchvision.transforms import ToTensor
 from torch.autograd import Variable
+from torch.nn.functional import softmax
 from tensorboardX import SummaryWriter
 
 from model_utils import visualise
@@ -124,12 +125,16 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         print(f"{split} {epoch} accuracy: {accuracy:.4f}")
         print(f"{split} {epoch} final loss: {loss:.4f}")        
 
-    def add_cam_img(self, target_img, img_class, cam_layer, epoch, input_size):
+    def add_cam_img(self, target_img, cam_layer, input_size, target_class=None, epoch=0):
         gradcam = visualise.GradCam(self.model, cam_layer)
-        cam_img = gradcam.create_gradcam_img(img_class, target_img, self.means, self.sdevs, input_size)
+        cam_img = gradcam.create_gradcam_img(target_img, target_class, self.means, self.sdevs, input_size)
         to_tensor = ToTensor()
         cam_tensor = to_tensor(cam_img)
-        self.writer.add_image(f'{cam_layer}_trueclass_{img_class}', cam_tensor, epoch)   
+        if target_class:
+            caption = f'pred_{gradcam.predicted_class}_true_{target_class}'
+        else:
+            caption = f'pred_{gradcam.predicted_class}'
+        self.writer.add_image(caption, cam_tensor, epoch)   
 
     def train(self, settings):
         """Performs model training"""
@@ -168,7 +173,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
 
             if 'lr_decay_patience' in settings:
                 lr_scheduler.step(epoch_train_loss)
-
+                
         if settings['shutdown'] is True:
             os.system("shutdown")        
 
@@ -192,13 +197,35 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         total_val_batches = len(self.val_loader)
         self.visualise_loss(settings, epoch_now, val_epoch_start, epoch_val_accuracy, total_val_batches, 'val')
         
-        if settings['cam_layer'] != None and settings['visualiser'] == 'tensorboard':
+        if settings['cam_layer'] is not None and settings['visualiser'] == 'tensorboard':
             images, labels = next(iter(self.train_loader))
             target_class = labels[0]
             target_img = Variable(images[0].unsqueeze(0))
-            self.add_cam_img(target_img, target_class, settings['cam_layer'], epoch_now, target_img.shape[-1])
+            out_size = target_img.shape[-1]
+            self.add_cam_img(target_img, settings['cam_layer'], out_size, target_class, epoch_now)
         
         self.print_results(epoch_now, epoch_val_loss, epoch_val_accuracy, 'val')
         print('Validation confusion matrix:\n', val_conf_matrix)
 
-    
+    def infer(self, image, transforms, cam_layer=None, target_class=None):
+        """Takes a single image and computes the most likely class
+        """
+        self.model = self.model.eval()
+        image = transforms(image).unsqueeze(0)  
+        if torch.cuda.is_available():
+            image = Variable(image.cuda())
+        else:
+            image = Variable(image)
+        output = self.model(image)
+        confidence = softmax(output, dim=1)
+        _, predicted_class_index = torch.max(output, 1)
+        predicted_class = self.classes[int(predicted_class_index)]
+        
+        if cam_layer is not None:
+            target_img = image.cpu()
+            gradcam = visualise.GradCam(self.model, cam_layer)
+            cam_img = gradcam.create_gradcam_img(target_img, target_class, self.means, self.sdevs, 224)
+        print(f"Predicted class: {predicted_class}")
+        print(f"Prediction confidence: {confidence}")
+        return [predicted_class, confidence, cam_img]
+        
