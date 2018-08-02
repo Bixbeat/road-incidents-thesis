@@ -22,29 +22,28 @@ if __name__ == "__main__":
     torch.cuda.manual_seed(seed)
 
     run_name = "ResNet-test"
-    data_dir = 'hymenoptera_data'
-    #data_dir = '/media/alex/A4A034E0A034BB1E/incidents-thesis/test-final/incidents_cleaned'
+    data_dir = 'hymenoptera'
+    # data_dir = '/media/alex/A4A034E0A034BB1E/incidents-thesis/test-run/incidents_cleaned'
 
-    n_epochs = 100
+    n_epochs = 50
     workers = 4
 
-    init_l_rate = 1e-3
-    l_rate_decay = 0.1
-    l_rate_decay_epoch = False # [25, 80, 200]
-    l_rate_decay_patience = 4
+    init_l_rate = 1e-4
+    lr_decay = 0.1
+    lr_decay_patience = 2
     w_decay = 1e-4
     
     batch_size = 5
     num_channels = 3
-    num_classes = 4
+    num_classes = 2
     
-    class_weights = torch.Tensor(get_relative_class_weights(data_dir))
+    class_weights = get_relative_class_weights(data_dir)
     if torch.cuda.is_available():
         class_weights = class_weights.cuda()
-    criterion = nn.CrossEntropyLoss(class_weights)
+    criterion = nn.CrossEntropyLoss()#class_weights)
     
     shutdown_after = False
-    report_results_per_n_batches = {'train':1, 'val':5}
+    report_results_per_n_batches = {'train':2, 'val':5}
     save_interval = 9999
     visualiser = 'tensorboard' # Visdom for local, Tensorboard for Colaboratory.
     cam_layer = 'conv1'
@@ -54,13 +53,15 @@ if __name__ == "__main__":
 # =============================================================================
     model = models.resnet18(pretrained=True)
     num_ftrs = model.fc.in_features
+    for param in model.parameters():
+        param.requires_grad = False
     model.fc = nn.Linear(num_ftrs, num_classes)
 
     if torch.cuda.is_available():
         criterion = criterion.cuda()
         model = model.cuda()
     
-    optimizer = optim.Adam(model.parameters(), lr=init_l_rate, weight_decay=w_decay)
+    optimizer = optim.RMSprop(model.fc.parameters(), lr=init_l_rate, weight_decay=w_decay)
 # =============================================================================
 #   DATA LOADING
 # =============================================================================
@@ -71,19 +72,13 @@ if __name__ == "__main__":
     sdevs = norm_params['sdevs']
 
     train_transforms = transforms.Compose([
-                        transforms.Resize(224),
-                        transforms.RandomCrop(224),
-                        transforms.RandomHorizontalFlip(),
-                        transforms.RandomGrayscale(),
-                        transforms.RandomRotation(15),
-                        transforms.ColorJitter(0.05, 0.05, 0.05, 0.05),
+                        transforms.Resize((224, 224)),
                         transforms.ToTensor(),
                         transforms.Normalize(means, sdevs)
                     ])
 
     val_transforms =  transforms.Compose([
-                        transforms.Resize(224),
-                        transforms.RandomCrop(224),
+                        transforms.Resize((224, 224)),
                         transforms.ToTensor(),
                         transforms.Normalize([means[0], means[1], means[2]], [sdevs[0], sdevs[1], sdevs[2]])
                     ])
@@ -103,7 +98,8 @@ if __name__ == "__main__":
 #   INITIALIZE RUNTIME CLASSES
 # =============================================================================
     analysis = runtime_logic.AnnotatedImageAnalysis(model, classes, means, sdevs, train_loader, val_loader)
-    analysis.loss_tracker.setup_output_storage(run_name, 'outputs/')
+    analysis.instantiate_loss_tracker(output_dir='outputs/')
+    analysis.loss_tracker.setup_output_storage(run_name)
 
 # =============================================================================
 #   INITIALIZE TRAINER    
@@ -116,9 +112,8 @@ if __name__ == "__main__":
                  # Hyperparameters
                  'n_epochs':n_epochs,
                  'batch_size':batch_size,
-                 'l_rate_decay':l_rate_decay,
-                 'l_rate_decay_epoch':l_rate_decay_epoch,
-                 'l_rate_decay_patience':l_rate_decay_patience,
+                 'lr_decay':lr_decay,
+                 'lr_decay_patience':lr_decay_patience,
                  
                  # Saving & Information retrieval
                  'report_interval':report_results_per_n_batches,
