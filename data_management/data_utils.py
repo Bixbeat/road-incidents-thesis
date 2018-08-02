@@ -69,6 +69,19 @@ class ImgDatabaseHandler():
         except sqlite3.IntegrityError as e:
             self.db.rollback()
             print(f'Cannot add split field: {e}')
+    
+    def del_missing_imgs(self, table, path_table_index, path_root):
+        try:
+            all_entries = self.get_all_records(table)
+        except sqlite3.IntegrityError as e:
+            self.db.rollback()
+            print(f'Cannot select entries: {e}')
+        for entry in all_entries:
+            img_path = os.path.join(path_root, entry[path_table_index])
+            if not os.path.isfile(img_path):
+                self.db.execute(f'DELETE FROM {table} WHERE img_id=(?)', [entry[path_table_index]])
+                print(f"Deleted nonexisting path from db: {img_path}")
+        self.db.commit()
 
 def determine_split(split_probs):
     if not split_probs['train'] + split_probs['val'] + split_probs['test'] == 100:
