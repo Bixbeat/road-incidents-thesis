@@ -101,7 +101,8 @@ def delete_equal_images_in_same_folder(root_dir):
 def delete_equal_images_from_root(root_dir):
     """For every image, checks every other image
     in that root directory for equivalence.
-    If equivalent, it removes the equivalent image."""
+    If equivalent, it removes the equivalent image
+    and retains the original image."""
     # Welcome to control structure hell
     total_deleted = 0
     remaining_subdirs = [x[0] for x in os.walk(root_dir)]
