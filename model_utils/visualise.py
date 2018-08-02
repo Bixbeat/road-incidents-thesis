@@ -207,11 +207,14 @@ class CamExtractor():
             if module_pos == self.target_layer:
                 x.register_hook(self.save_gradient)
                 conv_output = x  # Save the convolution output on that layer
+
+        layer_required_grad = True
+
         return conv_output, x
 
     def forward_pass(self, x):
         conv_output, x = self.forward_pass_on_convolutions(x)
-        return conv_output, x
+        return conv_output, x   
 
 class GradCam():
     """
@@ -222,10 +225,15 @@ class GradCam():
         self.target_layer = target_layer
         self.extractor = CamExtractor(self.model, target_layer)       
 
-    def generate_cam(self, input_image, means, sdevs, out_img_size=224, cam_transparency=0.5, unnormalize=True, target_class=None):
+        self.predicted_class = None
+        self.layer_required_grad = None
+
+    def generate_cam(self, input_image, means, sdevs, out_img_size=224, unnormalize=True, cam_transparency=0.5, target_class=None):
+        self._enable_gradient()
         conv_output, model_output = self.extractor.forward_pass(input_image)
+        self.predicted_class = np.argmax(model_output.data.numpy())
         if target_class is None:
-            target_class = np.argmax(model_output.data.numpy())
+            target_class = self.predicted_class
         self.model.zero_grad()
 
         original_img = var_to_cpu(input_image).data[0]
@@ -234,8 +242,9 @@ class GradCam():
 
         cam = self.results_to_cam(conv_output, model_output, target_class)
         cam_heatmap = self.cam_array_to_heatmap(cam, out_img_size)
-
         cam_overlaid = Image.blend(cam_heatmap, original_img, cam_transparency)
+
+        self._disable_grad_if_required()
         return cam_overlaid
 
     def results_to_cam(self, conv_output, model_output, target_class):
@@ -259,7 +268,7 @@ class GradCam():
         cam_resized = ImageOps.fit(cam_img, (out_img_size, out_img_size))
         return cam_resized
 
-    def create_gradcam_img(self, img_class, target_img, means, sdevs, input_size):
+    def create_gradcam_img(self, target_img, img_class, means, sdevs, input_size):
         cam_input_img = var_to_cpu(target_img)
         used_cuda = None
         if next(self.model.parameters()).is_cuda: #Most compact way to check if model is in cuda
@@ -271,7 +280,21 @@ class GradCam():
 
         if used_cuda:
             self.model = self.model.cuda()
-        return cam_img        
+        return cam_img      
+
+    def _enable_gradient(self):
+        # Enable gradient to layers so that it can be hooked
+        # method does NOT perform optimization
+        layer = self.model._modules.get(self.target_layer)
+        for param in layer.parameters():
+            self.layer_required_grad = param.requires_grad
+            param.requires_grad = True
+
+    def _disable_grad_if_required(self):
+        layer = self.model._modules.get(self.target_layer)
+        if self.layer_required_grad is False:
+            for param in layer.parameters():
+                param.requires_grad = False   
 
 def colourize_gradient(img_array):
     colour = mpl.cm.get_cmap('RdYlBu')
