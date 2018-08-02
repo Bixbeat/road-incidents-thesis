@@ -297,7 +297,7 @@ class GradCam():
             for param in layer.parameters():
                 param.requires_grad = False   
 
-    def colourize_gradient(img_array):
+    def colourize_gradient(self, img_array):
         colour = mpl.cm.get_cmap(self.colorramp)
         coloured_img = colour(img_array)
         return coloured_img
