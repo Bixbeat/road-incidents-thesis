@@ -220,7 +220,8 @@ class GradCam():
     """
         Produces class activation map
     """
-    def __init__(self, model, target_layer):
+    def __init__(self, model, target_layer, colorramp='inferno'):
+        self.colorramp = colorramp
         self.model = model.eval()
         self.target_layer = target_layer
         self.extractor = CamExtractor(self.model, target_layer)       
@@ -296,10 +297,10 @@ class GradCam():
             for param in layer.parameters():
                 param.requires_grad = False   
 
-def colourize_gradient(img_array):
-    colour = mpl.cm.get_cmap('RdYlBu')
-    coloured_img = colour(img_array)
-    return coloured_img
+    def colourize_gradient(img_array):
+        colour = mpl.cm.get_cmap(self.colorramp)
+        coloured_img = colour(img_array)
+        return coloured_img
 
 def normalized_img_tensor_to_pil(img_tensor, means, sdevs):
     bands = len(means)
