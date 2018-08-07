@@ -1,4 +1,5 @@
 import os
+from copy import deepcopy
 from collections import OrderedDict
 import pickle
 import numpy as np
@@ -119,6 +120,25 @@ class ConfusionMatrix():
         class_array[:,0] = np.arange(self.n_classes)
         out_matrix = np.hstack((class_array, self.matrix))
         return out_matrix
+
+def get_f1_scores(matrix):
+    f1_scores = []
+    for class_index, row in enumerate(matrix):
+        true_pos = row[class_index]
+        
+        false_pos = deepcopy(row)
+        false_pos_col = np.delete(false_pos, class_index)
+        false_pos = np.sum(false_pos_col)
+        
+        false_negs_col = deepcopy(matrix[:,class_index]) 
+        false_negs_col = np.delete(false_negs_col, class_index)
+        false_neg = np.sum(false_negs_col) 
+
+        precision = true_pos / (true_pos + false_pos)
+        recall = true_pos / (true_pos + false_neg)
+
+        f1_scores.append((2 / ( (1 / recall) + (1 / precision) )))
+    return f1_scores
 
 def weights_init(m):
     """For all convolutional layers in a model,
