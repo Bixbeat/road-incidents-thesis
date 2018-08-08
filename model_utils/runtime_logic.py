@@ -152,10 +152,11 @@ class AnnotatedImageAnalysis(ImageAnalysis):
 
         for epoch in range(settings['n_epochs']):
             train_epoch_start = dt.datetime.now()
-            epoch_now = epoch+1
             self.model = self.model.train()
 
             epoch_train_loss, epoch_train_accuracy, train_conf_matrix = self.run_singletask_model(settings, 'train', self.train_loader, optimizer=optimizer)
+
+            epoch_now = len(self.loss_tracker.all_loss['val'])+1
             self.loss_tracker.store_epoch_loss('train', epoch_now, epoch_train_loss, epoch_train_accuracy)
             self.loss_tracker.conf_matrix['train'].append(train_conf_matrix)
         
