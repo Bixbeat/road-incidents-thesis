@@ -193,28 +193,27 @@ class CamExtractor():
     def save_gradient(self, grad):
         self.gradients = grad
 
-    def forward_pass_on_convolutions(self, x):
+    def forward_pass_on_convolutions(self, input_img):
         """
             Does a forward pass on convolutions, hooks the function at given layer
         """
         conv_output = None
-        layer = self.model._modules.get(self.target_layer)
+        features = input_img
 
         for module_pos, module in self.model._modules.items():
             if module_pos == 'fc':
-                x = x.view(x.size(0), -1)            
-            x = module(x)  # Forward
+                features = features.view(features.size(0), -1)            
+            features = module(features)  # Forward
             if module_pos == self.target_layer:
-                x.register_hook(self.save_gradient)
-                conv_output = x  # Save the convolution output on that layer
+                features.register_hook(self.save_gradient)
+                conv_output = features  # Save the output on target layer
 
-        layer_required_grad = True
+        model_output = features
+        return conv_output, model_output
 
-        return conv_output, x
-
-    def forward_pass(self, x):
-        conv_output, x = self.forward_pass_on_convolutions(x)
-        return conv_output, x   
+    def forward_pass(self, input_img):
+        conv_output, model_output = self.forward_pass_on_convolutions(input_img)
+        return conv_output, model_output
 
 class GradCam():
     """
