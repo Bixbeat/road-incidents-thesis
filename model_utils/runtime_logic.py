@@ -222,6 +222,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         _, predicted_class_index = torch.max(output, 1)
         predicted_class = self.classes[int(predicted_class_index)]
         
+        cam_img = None
         if cam_layer is not None:
             target_img = image.cpu()
             gradcam = visualise.GradCam(self.model, cam_layer, colorramp)
