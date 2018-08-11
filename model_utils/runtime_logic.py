@@ -213,7 +213,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         """
         self.model = self.model.eval()
         image = transforms(image).unsqueeze(0)  
-        if torch.cuda.is_available() and cam_layer is not None:
+        if torch.cuda.is_available() and cam_layer is None:
             image = Variable(image.cuda())
         else:
             image = Variable(image)
