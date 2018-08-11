@@ -208,7 +208,7 @@ class AnnotatedImageAnalysis(ImageAnalysis):
         self.print_results(epoch_now, epoch_val_loss, epoch_val_accuracy, 'val')
         print('Validation confusion matrix:\n', val_conf_matrix)
 
-    def infer(self, image, transforms, cam_layer=None, target_class=None, colorramp='inferno'):
+    def infer(self, image, transforms, cam_layer=None, target_class=None, colorramp='inferno', verbose=False):
         """Takes a single image and computes the most likely class
         """
         self.model = self.model.eval()
@@ -227,7 +227,8 @@ class AnnotatedImageAnalysis(ImageAnalysis):
             target_img = image.cpu()
             gradcam = visualise.GradCam(self.model, cam_layer, colorramp)
             cam_img = gradcam.create_gradcam_img(target_img, target_class, self.means, self.sdevs, 224)
-        print(f"Predicted class: {predicted_class}")
-        print(f"Prediction confidence: {confidence}")
+        if verbose:
+            print(f"Predicted class: {predicted_class}")
+            print(f"Prediction confidence: {confidence}")
         return [predicted_class, confidence, cam_img]
         

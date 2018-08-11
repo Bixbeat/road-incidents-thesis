@@ -60,4 +60,4 @@ if __name__ == "__main__":
 # =============================================================================
     analysis = runtime_logic.AnnotatedImageAnalysis(model, classes, means, sdevs)
     img = Image.open(all_image_filepaths[0])
-    results = analysis.infer(img, transforms, cam_layer)
+    results = analysis.infer(img, transforms, cam_layer, colorramp='hot')

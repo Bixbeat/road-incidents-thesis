@@ -274,9 +274,8 @@ class GradCam():
         if next(self.model.parameters()).is_cuda: #Most compact way to check if model is in cuda
             self.model = self.model.cpu()
             used_cuda = True
-        
-        cam_extractor = GradCam(self.model, self.target_layer)
-        cam_img = cam_extractor.generate_cam(cam_input_img, means, sdevs, input_size, target_class=img_class)
+
+        cam_img = self.generate_cam(cam_input_img, means, sdevs, input_size, target_class=img_class)
 
         if used_cuda:
             self.model = self.model.cuda()
