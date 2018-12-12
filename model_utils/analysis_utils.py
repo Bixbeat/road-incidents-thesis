@@ -140,6 +140,12 @@ def get_f1_scores(matrix):
         f1_scores.append((2 / ( (1 / recall) + (1 / precision) )))
     return f1_scores
 
+def get_accuracies(matrix):
+    accuracies = []
+    for class_index, row in enumerate(matrix):
+        accuracies.append( row[class_index]/sum(row) )
+    return accuracies
+    
 def weights_init(m):
     """For all convolutional layers in a model,
     initialises weights using He-initialisation"""
